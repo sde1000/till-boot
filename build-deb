@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+if [ ${UID} != 0 ]; then
+  echo "This script must be run as root."
+  exit 1
+fi
+
+target=till-boot
+
+version=$(date +%Y%m%d%H%M%S)
+
+rm -rf $target
+
+mkdir -p $target/var/lib/tftpboot/casper
+
+mksquashfs rdir $target/var/lib/tftpboot/casper/till-${version}.squashfs -noappend
+chmod 644 $target/var/lib/tftpboot/casper/till-${version}.squashfs
+cp till-vmlinuz till-initrd.img filesystem.manifest README.diskdefines \
+    $target/var/lib/tftpboot/
+
+find $target -type f -print0 | xargs -0 md5sum >md5sums
+size=$(du -s $target | cut -f 1)
+mkdir -p $target/DEBIAN
+
+cat >$target/DEBIAN/control <<EOF
+Package: till-boot-trusty
+Version: ${version}
+Architecture: all
+Maintainer: Stephen Early <sde@individualpubs.co.uk>
+Installed-Size: ${size}
+Depends: tftpd-hpa, nfs-kernel-server, syslinux
+Conflicts: till-boot, till-boot-precise
+Section: python
+Priority: optional
+Description: Remote boot support for simple cash register software
+ Developed for Individual Pubs Limited in the UK.
+EOF
+
+mv md5sums $target/DEBIAN/
+
+dpkg-deb -b $target .

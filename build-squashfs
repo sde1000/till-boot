@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Build the squashfs and set things up for testing
+
+set -e
+
+destdir=/srv/tftp/tillboot
+
+mksquashfs rdir $destdir/casper/till.squashfs -noappend
+chmod 644 $destdir/casper/till.squashfs
+
+cp filesystem.manifest README.diskdefines till-initrd.img till-vmlinuz $destdir/
