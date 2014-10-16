@@ -2,3 +2,7 @@ We seem to have more luck running as real-root than fakeroot.
 
 build-squashfs is just for testing.  Use build-deb to make the real
 package.
+
+Packages to install on the machine doing the building:
+
+squashfs-tools
