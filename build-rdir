@@ -15,9 +15,9 @@ distribution=trusty
 arch=i386
 
 # Don't install quicktill; we fetch that on each boot because it may
-# be harmful to install an old version.  install=quicktill1 is needed
+# be harmful to install an old version.  install=quicktill2 is needed
 # as a kernel command line argument.
-extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd python-psycopg2 python-reportlab python-httplib2 python-qrcode python-sqlalchemy python-yaml quicktill-nfc-bridge oidentd usbutils pciutils python-cups python-odf telnet strace tcpdump python-twitter python-oauthlib python-requests"
+extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python-psycopg2 python-reportlab python-httplib2 python-qrcode python-sqlalchemy python-yaml quicktill-nfc-bridge oidentd usbutils pciutils python-cups python-odf telnet strace tcpdump python-twitter python-oauthlib python-requests python-matplotlib"
 
 target=./rdir
 

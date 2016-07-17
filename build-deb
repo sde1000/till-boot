@@ -8,17 +8,26 @@ if [ ${UID} != 0 ]; then
 fi
 
 target=till-boot
+tftpboot=$target/var/lib/tftpboot
 
 version=$(date +%Y%m%d%H%M%S)
 
 rm -rf $target
 
-mkdir -p $target/var/lib/tftpboot/casper
+mkdir -p $tftpboot/casper
 
-mksquashfs rdir $target/var/lib/tftpboot/casper/till-${version}.squashfs -noappend
-chmod 644 $target/var/lib/tftpboot/casper/till-${version}.squashfs
+cp /usr/lib/PXELINUX/pxelinux.0 $tftpboot/
+cp /usr/lib/syslinux/modules/bios/ldlinux.c32 $tftpboot/
+mkdir -p $tftpboot/pxelinux.cfg
+cp /usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed $tftpboot/grubx64.efi
+cp /usr/lib/shim/shim.efi.signed $tftpboot/bootx64.efi
+mkdir -p $tftpboot/grub/fonts
+cp /usr/share/grub/unicode.pf2 $tftpboot/grub/fonts/
+
+mksquashfs rdir $tftpboot/casper/till-${version}.squashfs -noappend
+chmod 644 $tftpboot/casper/till-${version}.squashfs
 cp till-vmlinuz till-initrd.img filesystem.manifest README.diskdefines \
-    $target/var/lib/tftpboot/
+    $tftpboot/
 
 find $target -type f -print0 | xargs -0 md5sum >md5sums
 size=$(du -s $target | cut -f 1)

@@ -4,7 +4,7 @@
 
 set -e
 
-destdir=/srv/tftp/tillboot
+destdir=/var/lib/tftpboot
 
 mksquashfs rdir $destdir/casper/till.squashfs -noappend
 chmod 644 $destdir/casper/till.squashfs
