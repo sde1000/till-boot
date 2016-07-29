@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# Only run if /root/chroot-setup exists, i.e. we are running in the
+# chroot environment
+test -e /root/chroot-setup || exit 1
+
+echo "Start of chroot-setup"
+
+locale-gen en_GB.UTF-8
+debconf-set-selections <<EOF
+tzdata tzdata/Areas select Europe
+tzdata tzdata/Zones/Europe select London
+EOF
+
+export DEBIAN_FRONTEND=teletype
+
+echo Europe/London >/etc/timezone
+dpkg-reconfigure -u tzdata
+
+apt-key add /root/repo-signing-key.gpg
+apt-get update
+apt-get -y install dbus
+apt-get -y dist-upgrade
+apt-get --no-install-recommends -y install network-manager casper
+
+# Choose a UK keyboard...
+cat >/etc/default/keyboard <<EOF
+XKBMODEL="pc105"
+XKBLAYOUT="gb"
+XKBVARIANT=""
+XKBOPTIONS=""
+EOF
+
+# Blacklist display drivers here - stay in text mode if we can!
+# vga16fb puts tills in modes that some LCD monitors can't auto-detect
+echo blacklist vga16fb >/etc/modprobe.d/blacklist-till.conf
+
+# Setup initramfs for network boot
+cp /etc/initramfs-tools/initramfs.conf /root/
+sed s/BOOT=local/BOOT=nfs/ \
+  </root/initramfs.conf >/etc/initramfs-tools/initramfs.conf
+rm /root/initramfs.conf
+echo blacklist vga16fb >>/etc/initramfs-tools/modules
+
+# Change casper config
+cat >/etc/casper.conf <<EOF
+# This file should go in /etc/casper.conf
+# Supported variables are:
+# USERNAME, USERFULLNAME, HOST, BUILD_SYSTEM
+
+export USERNAME="till"
+export USERFULLNAME="Till"
+export HOST="till"
+export BUILD_SYSTEM="Ubuntu"
+EOF
+# Zap bits of casper that are doing unhelpful things!
+rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
+
+apt-get -y install $(cat /root/extrainstall)
+
+# The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
+# /proc is mounted during the kernel installation.
+apt-get -y --no-install-recommends install linux-generic
+
+# Clean up package caches
+apt-get update
+apt-get clean
+dpkg --clear-avail
+
+echo "chroot-setup done"

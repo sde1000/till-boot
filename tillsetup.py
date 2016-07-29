@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """This script is run at boot time on the network-booted system.  It
 does some general setup, then arranges to invoke the till software
@@ -7,8 +7,6 @@ from the kernel command line.
 
 """
 
-from __future__ import print_function
-from __future__ import unicode_literals
 import sys
 import string
 from subprocess import call
@@ -23,7 +21,7 @@ for i in words:
     xs = i.split('=')
     if len(xs) < 2:
         continue
-    config[xs[0]] = i[len(xs[0])+1:]
+    config[xs[0]] = i[len(xs[0]) + 1:]
 
 print("Configuration found: {}".format(repr(config)))
 
@@ -40,15 +38,15 @@ if "install" in config:
     call(['/usr/bin/apt-get', '-y', 'install']+
          config["install"].split(','))
 
-dbstring=[]
+dbstring = []
 if "dbname" in config:
-    dbstring.append("dbname="+config["dbname"])
+    dbstring.append("dbname=" + config["dbname"])
 if "dbhost" in config:
-    dbstring.append("host="+config["dbhost"])
+    dbstring.append("host=" + config["dbhost"])
 if "dbuser" in config:
-    dbstring.append("user="+config["dbuser"])
+    dbstring.append("user=" + config["dbuser"])
 if "dbpassword" in config:
-    dbstring.append("password="+config["dbpassword"])
+    dbstring.append("password=" + config["dbpassword"])
 
 # If a print server is specified, create an appropriate /etc/cups/client.conf
 if "printserver" in config:
@@ -74,7 +72,7 @@ if len(dbstring)>0:
 if "tillcmd" in config:
     runtillargs.append(config["tillcmd"])
 
-font=config.get("tillfont","Uni2-TerminusBold22x11.psf.gz")
+font = config.get("tillfont", "Uni2-TerminusBold22x11.psf.gz")
 
 # Options are "off", "on", "vsync", "powerdown", "hsync"
 powerdown = config.get("powerdown", "1")
@@ -103,7 +101,7 @@ if [ "$(tty)" = "/dev/tty1" ]; then
     sleep 1
     exit
     fi
-""".format(font = font,
-           runtillargs = ' '.join(runtillargs)))
+""".format(font=font,
+           runtillargs=' '.join(runtillargs)))
 
 # That should be it!  Casper will already have arranged for auto-login

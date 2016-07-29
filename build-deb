@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Depends:
+# pxelinux syslinux-common grub-efi-amd64-signed shim-signed grub-common
+
 set -e
 
 if [ ${UID} != 0 ]; then
@@ -34,14 +37,13 @@ size=$(du -s $target | cut -f 1)
 mkdir -p $target/DEBIAN
 
 cat >$target/DEBIAN/control <<EOF
-Package: till-boot-trusty
+Package: till-boot-xenial
 Version: ${version}
 Architecture: all
-Maintainer: Stephen Early <sde@individualpubs.co.uk>
+Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
 Depends: tftpd-hpa, nfs-kernel-server, syslinux
 Conflicts: till-boot, till-boot-precise
-Section: python
 Priority: optional
 Description: Remote boot support for simple cash register software
  Developed for Individual Pubs Limited in the UK.

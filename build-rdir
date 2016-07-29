@@ -3,56 +3,39 @@
 set -e
 
 if [ ${UID} != 0 ]; then
-  echo "This script must be run as (fake)root."
+  echo "This script must be run as root."
   exit 1
 fi
 
 # Address of pub company's apt repository to be baked into the image
 repoaddr=http://www.individualpubs.co.uk/software
 
-distribution=trusty
+distribution=xenial
 
 arch=i386
 
 # Don't install quicktill; we fetch that on each boot because it may
 # be harmful to install an old version.  install=quicktill2 is needed
 # as a kernel command line argument.
-extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python-psycopg2 python-reportlab python-httplib2 python-qrcode python-sqlalchemy python-yaml quicktill-nfc-bridge oidentd usbutils pciutils python-cups python-odf telnet strace tcpdump python-twitter python-oauthlib python-requests python-matplotlib"
+extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib"
 
 target=./rdir
 
-export http_proxy=http://www-cache.pembury.i.individualpubs.co.uk:3128/
+export http_proxy=http://localhost:3142/
 source=http://gb.archive.ubuntu.com/ubuntu/
 
 rm -rf $target
 mkdir $target
 
-#debootstrap --variant=fakechroot $distribution $target \
-#    $source 2>&1 |tee $target-build-log
 debootstrap --arch=${arch} $distribution $target $source 2>&1
 
-# Add invoke-rc.d policy to ensure nothing gets started
-cat >$target/usr/sbin/policy-rc.d <<EOF
-#!/bin/bash
-
-exit 101
-EOF
-chmod +x $target/usr/sbin/policy-rc.d
-# Move initctl out of the way
-chroot $target dpkg-divert --local --rename --add /sbin/initctl
-chroot $target ln -s /bin/true /sbin/initctl
-
-# Mount /proc and /dev
-chroot $target mount /proc
-chroot $target mount /dev
-chroot $target mount /dev/pts
-
+# Seed the target with some useful files
 cat >$target/etc/default/locale <<EOF
 LANG="en_GB.UTF-8"
 EOF
 
 cat >$target/etc/apt/apt.conf.d/40proxy <<EOF
-Acquire::http::Proxy "http://www-cache.pembury.i.individualpubs.co.uk:3128/";
+Acquire::http::Proxy "$http_proxy";
 EOF
 cat >$target/etc/apt/sources.list <<EOF
 deb http://gb.archive.ubuntu.com/ubuntu $distribution main restricted universe multiverse
@@ -61,98 +44,26 @@ deb http://security.ubuntu.com/ubuntu $distribution-security main restricted uni
 deb $repoaddr $distribution-tills main
 EOF
 
-chroot $target locale-gen en_GB.UTF-8
+# Copy the setup script into the target
+cp chroot-setup $target/root/
+cp repo-signing-key.gpg $target/root/
+echo $extrainstall >$target/root/extrainstall
 
-# These don't appear to exist any more...
-#console-setup console-setup/altgr select Right Alt
-#console-setup console-setup/fontface select VGA
-#console-setup console-setup/layout select United Kingdom
-#console-setup console-setup/variant select United Kingdom
+# Invoke the setup script in the target
+systemd-nspawn -D $target/ -a /root/chroot-setup
 
-chroot $target debconf-set-selections <<EOF
-tzdata tzdata/Areas select Europe
-tzdata tzdata/Zones/Europe select London
-EOF
-export DEBIAN_FRONTEND=teletype
-
-echo Europe/London >$target/etc/timezone
-chroot $target dpkg-reconfigure -u tzdata
-
-cat repo-signing-key.gpg | chroot $target apt-key add -
-chroot $target apt-get update
-chroot $target apt-get install --yes dbus console-setup
-chroot $target dbus-uuidgen >$target/var/lib/dbus/machine-id
-chroot $target apt-get -y dist-upgrade
-chroot $target apt-get --no-install-recommends -y install network-manager
-chroot $target apt-get -y install casper
-
-#rm -f $target/etc/default/console-setup
-#rm -f $target/etc/console-setup/boottime.kmap.gz
-#chroot $target dpkg-reconfigure -u -p critical console-setup && true
-
-# Choose a UK keyboard...
-cat >$target/etc/default/keyboard <<EOF
-XKBMODEL="pc105"
-XKBLAYOUT="gb"
-XKBVARIANT=""
-XKBOPTIONS=""
-EOF
-
-# Blacklist display drivers here - stay in text mode if we can!
-# vga16fb puts tills in modes that some LCD monitors can't auto-detect
-echo blacklist vga16fb >$target/etc/modprobe.d/blacklist-till.conf
-
-# Setup initramfs for network boot
-cp $target/etc/initramfs-tools/initramfs.conf .
-sed s/BOOT=local/BOOT=nfs/ \
-  <initramfs.conf >$target/etc/initramfs-tools/initramfs.conf
-rm initramfs.conf
-echo blacklist vga16fb >>$target/etc/initramfs-tools/modules
-
-# Change casper config
-cat >$target/etc/casper.conf <<EOF
-# This file should go in /etc/casper.conf
-# Supported variables are:
-# USERNAME, USERFULLNAME, HOST, BUILD_SYSTEM
-
-export USERNAME="till"
-export USERFULLNAME="Till"
-export HOST="till"
-export BUILD_SYSTEM="Ubuntu"
-EOF
-# Zap bits of casper that are doing unhelpful things!
-rm -f $target/usr/share/initramfs-tools/scripts/casper-bottom/02timezone
-
-chroot $target apt-get -y install $extrainstall
-
-# The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
-# /proc is mounted during the kernel installation.
-chroot $target apt-get -y --no-install-recommends install linux-generic
+# Clean up
+rm $target/root/extrainstall
+rm $target/root/repo-signing-key.gpg
+rm $target/root/chroot-setup
 
 # Leave only our private repository in the apt sources list
 cat >$target/etc/apt/sources.list <<EOF
 deb $repoaddr $distribution-tills main
 deb-src $repoaddr $distribution-tills main
 EOF
+# Don't use our local proxy to fetch packages any more
 rm $target/etc/apt/apt.conf.d/40proxy
-
-# Clean up package caches
-chroot $target apt-get update
-chroot $target apt-get clean
-chroot $target dpkg --clear-avail
-
-# Unmount /proc and /dev
-chroot $target umount /dev/pts
-chroot $target umount /dev
-chroot $target umount /proc
-
-# Remove invoke-rc.d policy
-rm $target/usr/sbin/policy-rc.d
-
-# Remove diversion of initctl
-chroot $target rm /sbin/initctl
-chroot $target dpkg-divert --rename --remove /sbin/initctl
-rm $target/var/lib/dbus/machine-id
 
 # We need to copy the kernel and initrd to outside the target because
 # they will be installed on the network boot server.
@@ -179,11 +90,14 @@ cp tillsetup.py $target/etc/init.d/tillsetup
 chmod +x $target/etc/init.d/tillsetup
 ln -s ../init.d/tillsetup $target/etc/rcS.d/S99tillsetup
 
+# Zap the machine ID so it's regenerated on each reboot
+rm $target/var/lib/dbus/machine-id
+
 # Build the manifest file
 chroot $target dpkg-query -W --showformat='${Package} ${Version}\n' >filesystem.manifest
 # Diskdefines
 cat >README.diskdefines <<EOF
-#define DISKNAME  IPL Till Netboot Trusty
+#define DISKNAME  IPL Till Netboot Xenial
 #define TYPE  binary
 #define TYPEbinary  1
 #define ARCH  ${arch}
