@@ -43,7 +43,7 @@ Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
 Depends: tftpd-hpa, nfs-kernel-server, syslinux
-Conflicts: till-boot, till-boot-precise
+Conflicts: till-boot, till-boot-precise, till-boot-trusty
 Priority: optional
 Description: Remote boot support for simple cash register software
  Developed for Individual Pubs Limited in the UK.

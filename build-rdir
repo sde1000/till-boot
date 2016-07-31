@@ -17,7 +17,7 @@ arch=i386
 # Don't install quicktill; we fetch that on each boot because it may
 # be harmful to install an old version.  install=quicktill3 is needed
 # as a kernel command line argument.
-extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget"
+extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget man-db"
 
 target=./rdir
 
@@ -78,7 +78,7 @@ rm -f $target/etc/resolv.conf
 
 # The diskless terminal thinks it is called "till".  The real till is
 # probably also called "till".  Look at the DNS first to get the right answer!
-sed "s/files dns/dns files/" <$target/etc/nsswitch.conf >$target/etc/nsswitch.conf.new
+sed "s/^hosts:.*$/hosts: mdns4_minimal \\[NOTFOUND=return] dns files/" <$target/etc/nsswitch.conf >$target/etc/nsswitch.conf.new
 mv $target/etc/nsswitch.conf.new $target/etc/nsswitch.conf
 
 # For some reason the "lp" module is not loaded automatically, so

@@ -5,4 +5,4 @@ package.
 
 Packages to install on the machine doing the building:
 
-squashfs-tools
+debootstrap squashfs-tools systemd-container pxelinux syslinux-common grub-efi-amd64-signed shim-signed grub-common

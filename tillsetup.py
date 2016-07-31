@@ -28,7 +28,7 @@ for i in words:
         continue
     config[xs[0]] = i[len(xs[0]) + 1:]
 
-print("Configuration found: {}".format(repr(config)))
+#print("Configuration found: {}".format(repr(config)))
 
 # Update packages from the pubco private repository if possible
 call(['/usr/bin/apt-get', 'update'])
@@ -74,21 +74,17 @@ if "configname" in config:
         f.write(config["configname"] + "\n")
 
 font = config.get("tillfont", "Uni2-TerminusBold22x11.psf.gz")
-
-call(['/bin/setfont', '/usr/share/consolefonts/{}'.format(font)])
+with open("/home/till/font", "w") as f:
+    f.write(font + "\n")
 
 # Options are "off", "on", "vsync", "powerdown", "hsync"
 screenblank = config.get("screenblank", "10")
 powerdown = config.get("powerdown", "1")
 powersavemode = config.get("powersavemode", "powerdown")
 
-# If there's a kernel consoleblank parameter, we want to avoid overriding it
-if consoleblank not in config:
-    call(['/usr/bin/setterm',
-          '-blank', screenblank,
-          '-powerdown', powerdown,
-          '-powersave', powersavemode,
-          '-msg', 'off',
-    ])
+with open("/home/till/screenblank", "w") as f:
+    if "consoleblank" not in config:
+        f.write("/usr/bin/setterm -blank {} -powerdown {} -powersave {} "
+                "-msg off".format(screenblank, powerdown, powersavemode))
 
 # That should be it!

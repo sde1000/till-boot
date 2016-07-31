@@ -61,6 +61,7 @@ adduser till sudo
 adduser till lpadmin
 adduser till lp
 passwd -d till
+passwd -d root
 
 echo " --> adding run-till script to till user's home directory"
 cat >/home/till/runtill <<EOF
@@ -92,6 +93,8 @@ cat >>/home/till/.profile <<EOF
 
 # Start up till software automatically on tty1
 if [ "\$(tty)" = "/dev/tty1" ]; then
+  setfont /usr/share/consolefonts/\$(cat font)
+  sudo bash -c "source ./screenblank"
   sudo apt-get update
   sudo apt-get -y dist-upgrade
   exec ./runtill
@@ -113,12 +116,22 @@ mkdir -p /etc/systemd/system/getty\@tty1.service.d
 cat >/etc/systemd/system/getty\@tty1.service.d/override.conf <<EOF
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/local/bin/login-till --noclear %I $TERM
+ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/local/bin/login-till --noclear %I \$TERM
 EOF
 
 echo " --> zapping unhelpful bits of casper"
 # Zap bits of casper that are doing unhelpful things!
-rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
+cat >/etc/casper.conf <<EOF
+USERNAME=
+USERFULLNAME=
+HOST=till
+BUILD_SYSTEM=Ubuntu
+EOF
+#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
+rm -f /usr/share/initramfs-tools/scripts/casper-bottom/10adduser
+rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
+#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/15autologin
+#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
 
 echo " --> installing extra requested packages"
 apt-get -y install $(cat /root/extrainstall)
