@@ -4,15 +4,20 @@
 does some general setup, then arranges to invoke the till software
 with configuration URL, configname and database connection details
 from the kernel command line.
-
 """
 
 import sys
 import string
 from subprocess import call
 
-with file("/proc/cmdline") as f:
-    cmdline = f.readline()
+try:
+    with open("/tillsetup-cmdline") as f:
+        cmdline = f.readline()
+        testing = True
+except FileNotFoundError:
+    with open("/proc/cmdline") as f:
+        cmdline = f.readline()
+        testing = False
 
 words = cmdline.split()
 config = {}
@@ -31,7 +36,7 @@ call(['/usr/bin/apt-get', '-y', 'dist-upgrade'])
 
 if "configurl" in config:
     call(['/bin/mkdir', '-p', '/etc/quicktill'])
-    with file("/etc/quicktill/configurl", 'w') as f:
+    with open("/etc/quicktill/configurl", 'w') as f:
         f.write("{}\n".format(config['configurl']))
 
 if "install" in config:
@@ -47,11 +52,14 @@ if "dbuser" in config:
     dbstring.append("user=" + config["dbuser"])
 if "dbpassword" in config:
     dbstring.append("password=" + config["dbpassword"])
+if len(dbstring) > 0:
+    with open("/home/till/database", "w") as f:
+        f.write(" ".join(dbstring) + "\n")
 
 # If a print server is specified, create an appropriate /etc/cups/client.conf
 if "printserver" in config:
     call(['/bin/mkdir', '-p', '/etc/cups'])
-    with file("/etc/cups/client.conf", 'w') as f:
+    with open("/etc/cups/client.conf", 'w') as f:
         f.write("ServerName {}\n".format(config["printserver"]))
 
 # Some framebuffers don't come up in the correct resolution by default.
@@ -61,47 +69,26 @@ if "xres" in config:
 if "yres" in config:
     call(['/bin/fbset', '-a', '-match', '-yres', config["yres"]])
 
-# Allow 'till' user to access printers directly
-call(['/usr/sbin/adduser', 'till', 'lp'])
-
-runtillargs = []
 if "configname" in config:
-    runtillargs = runtillargs + ["-c", config["configname"]]
-if len(dbstring)>0:
-    runtillargs = runtillargs + ["-d","\"{}\"".format(string.join(dbstring))]
-if "tillcmd" in config:
-    runtillargs.append(config["tillcmd"])
+    with open("/home/till/configname", "w") as f:
+        f.write(config["configname"] + "\n")
 
 font = config.get("tillfont", "Uni2-TerminusBold22x11.psf.gz")
 
+call(['/bin/setfont', '/usr/share/consolefonts/{}'.format(font)])
+
 # Options are "off", "on", "vsync", "powerdown", "hsync"
+screenblank = config.get("screenblank", "10")
 powerdown = config.get("powerdown", "1")
 powersavemode = config.get("powersavemode", "powerdown")
+
 # If there's a kernel consoleblank parameter, we want to avoid overriding it
-consoleblank = config.get("consoleblank", None)
+if consoleblank not in config:
+    call(['/usr/bin/setterm',
+          '-blank', screenblank,
+          '-powerdown', powerdown,
+          '-powersave', powersavemode,
+          '-msg', 'off',
+    ])
 
-with file("/home/till/.profile", "a") as f:
-    if consoleblank is None:
-        f.write("""
-sudo setterm -blank 10 -powerdown {powerdown} -powersave {powersavemode} -msg off
-""".format(powerdown = powerdown, powersavemode = powersavemode))
-    f.write("""
-setfont /usr/share/consolefonts/{font}
-if [ "$(tty)" = "/dev/tty1" ]; then
-    sudo apt-get update
-    sudo apt-get -y dist-upgrade
-    runtill {runtillargs}
-    tillexit=$?
-    sleep 2
-    case "$tillexit" in
-    0) exit ;;
-    2) sudo poweroff ;;
-    3) sudo reboot ;;
-    esac
-    sleep 1
-    exit
-    fi
-""".format(font=font,
-           runtillargs=' '.join(runtillargs)))
-
-# That should be it!  Casper will already have arranged for auto-login
+# That should be it!

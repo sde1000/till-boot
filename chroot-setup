@@ -6,23 +6,32 @@ test -e /root/chroot-setup || exit 1
 
 echo "Start of chroot-setup"
 
+export DEBIAN_FRONTEND=noninteractive
+
+echo " --> generating locales"
 locale-gen en_GB.UTF-8
+echo " --> setting timezone"
 debconf-set-selections <<EOF
 tzdata tzdata/Areas select Europe
 tzdata tzdata/Zones/Europe select London
 EOF
-
-export DEBIAN_FRONTEND=teletype
-
 echo Europe/London >/etc/timezone
 dpkg-reconfigure -u tzdata
 
+echo " --> adding ipltd apt repository signing key"
 apt-key add /root/repo-signing-key.gpg
 apt-get update
+
+echo " --> installing dbus"
 apt-get -y install dbus
+
+echo " --> doing dist-upgrade"
 apt-get -y dist-upgrade
+
+echo " --> installing network-manager and casper"
 apt-get --no-install-recommends -y install network-manager casper
 
+echo " --> choosing UK keyboard"
 # Choose a UK keyboard...
 cat >/etc/default/keyboard <<EOF
 XKBMODEL="pc105"
@@ -31,10 +40,12 @@ XKBVARIANT=""
 XKBOPTIONS=""
 EOF
 
+echo " --> blacklisting display drivers"
 # Blacklist display drivers here - stay in text mode if we can!
 # vga16fb puts tills in modes that some LCD monitors can't auto-detect
 echo blacklist vga16fb >/etc/modprobe.d/blacklist-till.conf
 
+echo " --> setting up initramfs for network boot"
 # Setup initramfs for network boot
 cp /etc/initramfs-tools/initramfs.conf /root/
 sed s/BOOT=local/BOOT=nfs/ \
@@ -42,28 +53,83 @@ sed s/BOOT=local/BOOT=nfs/ \
 rm /root/initramfs.conf
 echo blacklist vga16fb >>/etc/initramfs-tools/modules
 
-# Change casper config
-cat >/etc/casper.conf <<EOF
-# This file should go in /etc/casper.conf
-# Supported variables are:
-# USERNAME, USERFULLNAME, HOST, BUILD_SYSTEM
+echo " --> adding till user"
+# Add the till user
+adduser --add_extra_groups --gecos Till --disabled-password till
+adduser till adm
+adduser till sudo
+adduser till lpadmin
+adduser till lp
+passwd -d till
 
-export USERNAME="till"
-export USERFULLNAME="Till"
-export HOST="till"
-export BUILD_SYSTEM="Ubuntu"
+echo " --> adding run-till script to till user's home directory"
+cat >/home/till/runtill <<EOF
+#!/bin/bash
+
+# This script invokes the till software and deals with any exit code.
+
+runtill -c \$(cat configname) -d "\$(cat database)" start \\
+  -e 0 "Exit / restart till software" \\
+  -e 2 "Power off till" \\
+  -e 3 "Reboot till" \\
+  -i 4
+tillexit=\$?
+sleep 2
+case "\$tillexit" in
+  0) exit ;;
+  2) sudo poweroff ;;
+  3) sudo reboot ;;
+esac
+sleep 1
+exit
 EOF
+chown till.till /home/till/runtill
+chmod 755 /home/till/runtill
+
+echo " --> updating till user's .profile"
+# Update the till user's .profile
+cat >>/home/till/.profile <<EOF
+
+# Start up till software automatically on tty1
+if [ "\$(tty)" = "/dev/tty1" ]; then
+  sudo apt-get update
+  sudo apt-get -y dist-upgrade
+  exec ./runtill
+fi
+EOF
+
+echo " --> setting up autologin on tty1"
+cat >/usr/local/bin/login-till <<EOF
+#!/bin/bash
+
+# This file should be installed in /usr/local/bin
+
+echo Till login...
+stty -ixon -ixoff
+exec /bin/login -f till AUTORUN=yes
+EOF
+chmod +x /usr/local/bin/login-till
+mkdir -p /etc/systemd/system/getty\@tty1.service.d
+cat >/etc/systemd/system/getty\@tty1.service.d/override.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/local/bin/login-till --noclear %I $TERM
+EOF
+
+echo " --> zapping unhelpful bits of casper"
 # Zap bits of casper that are doing unhelpful things!
 rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
 
+echo " --> installing extra requested packages"
 apt-get -y install $(cat /root/extrainstall)
 
+echo " --> installing kernel"
 # The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
 # /proc is mounted during the kernel installation.
 apt-get -y --no-install-recommends install linux-generic
 
+echo " --> cleaning up package caches"
 # Clean up package caches
-apt-get update
 apt-get clean
 dpkg --clear-avail
 

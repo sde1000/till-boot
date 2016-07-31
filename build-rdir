@@ -15,9 +15,9 @@ distribution=xenial
 arch=i386
 
 # Don't install quicktill; we fetch that on each boot because it may
-# be harmful to install an old version.  install=quicktill2 is needed
+# be harmful to install an old version.  install=quicktill3 is needed
 # as a kernel command line argument.
-extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib"
+extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget"
 
 target=./rdir
 
