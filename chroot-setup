@@ -53,6 +53,13 @@ sed s/BOOT=local/BOOT=nfs/ \
 rm /root/initramfs.conf
 echo blacklist vga16fb >>/etc/initramfs-tools/modules
 
+# Experimental: set managed=true in /etc/NetworkManager/NetworkManager.conf
+#cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf.old
+#sed s/managed=false/managed=true/ \
+#    </etc/NetworkManager/NetworkManager.conf.old \
+#    >/etc/NetworkManager/NetworkManager.conf
+
+
 echo " --> adding till user"
 # Add the till user
 adduser --add_extra_groups --gecos Till --disabled-password till
@@ -132,9 +139,17 @@ rm -f /usr/share/initramfs-tools/scripts/casper-bottom/10adduser
 rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/15autologin
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
+#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/23networking
 
 echo " --> installing extra requested packages"
 apt-get -y install $(cat /root/extrainstall)
+
+echo " --> setting udev rules for printers"
+cat >/etc/udev/rules.d/60-epson.rules <<EOF
+# Epson receipt printer
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0e03", SYMLINK+="epson-tm-t20"
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0202", SYMLINK+="epson-tm-u220"
+EOF
 
 echo " --> installing kernel"
 # The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
