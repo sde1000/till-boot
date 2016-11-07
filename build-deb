@@ -51,4 +51,4 @@ EOF
 
 mv md5sums $target/DEBIAN/
 
-dpkg-deb -b $target .
+dpkg-deb -Znone -b $target .
