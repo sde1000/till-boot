@@ -22,7 +22,7 @@ mkdir -p $tftpboot/casper
 cp /usr/lib/PXELINUX/pxelinux.0 $tftpboot/
 cp /usr/lib/syslinux/modules/bios/ldlinux.c32 $tftpboot/
 mkdir -p $tftpboot/pxelinux.cfg
-cp /usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed $tftpboot/grubx64.efi
+cp /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed $tftpboot/grubx64.efi
 cp /usr/lib/shim/shim.efi.signed $tftpboot/bootx64.efi
 mkdir -p $tftpboot/grub/fonts
 cp /usr/share/grub/unicode.pf2 $tftpboot/grub/fonts/
