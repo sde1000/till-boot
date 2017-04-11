@@ -22,6 +22,11 @@ echo " --> adding ipltd apt repository signing key"
 apt-key add /root/repo-signing-key.gpg
 apt-get update
 
+# makedev is currently buggy and tries to create files in /dev on upgrade
+# in a container.
+echo " --> holding makedev"
+apt-mark hold makedev
+
 echo " --> installing dbus"
 apt-get -y install dbus
 
@@ -154,7 +159,7 @@ EOF
 echo " --> installing kernel"
 # The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
 # /proc is mounted during the kernel installation.
-apt-get -y --no-install-recommends install linux-generic
+apt-get -y --no-install-recommends install linux-generic-hwe-16.04
 
 echo " --> cleaning up package caches"
 # Clean up package caches
