@@ -1,8 +1,11 @@
 #!/bin/bash
 
-# Only run if /root/chroot-setup exists, i.e. we are running in the
+# This script runs inside the chroot to customise it.  It's invoked by
+# build-rdir using systemd-nspawn.
+
+# Only run if /root/scripts/chroot-setup exists, i.e. we are running in the
 # chroot environment
-test -e /root/chroot-setup || exit 1
+test -e /root/scripts/chroot-setup || exit 1
 
 echo "Start of chroot-setup"
 
@@ -18,14 +21,8 @@ EOF
 echo Europe/London >/etc/timezone
 dpkg-reconfigure -u tzdata
 
-echo " --> adding ipltd apt repository signing key"
-apt-key add /root/repo-signing-key.gpg
+echo " --> refreshing package cache"
 apt-get update
-
-# makedev is currently buggy and tries to create files in /dev on upgrade
-# in a container.
-echo " --> holding makedev"
-apt-mark hold makedev
 
 echo " --> installing dbus"
 apt-get -y install dbus
@@ -53,7 +50,8 @@ echo blacklist vga16fb >/etc/modprobe.d/blacklist-till.conf
 echo " --> setting up initramfs for network boot"
 # Setup initramfs for network boot
 cp /etc/initramfs-tools/initramfs.conf /root/
-sed s/BOOT=local/BOOT=nfs/ \
+sed -e 's/^MODULES=.*$/MODULES=netboot/' \
+    -e '$a\RESUME=none' \
   </root/initramfs.conf >/etc/initramfs-tools/initramfs.conf
 rm /root/initramfs.conf
 echo blacklist vga16fb >>/etc/initramfs-tools/modules
@@ -66,7 +64,6 @@ echo blacklist vga16fb >>/etc/initramfs-tools/modules
 
 
 echo " --> adding till user"
-# Add the till user
 adduser --add_extra_groups --gecos Till --disabled-password till
 adduser till adm
 adduser till sudo
@@ -75,55 +72,17 @@ adduser till lp
 passwd -d till
 passwd -d root
 
+echo " --> copying setup script to /usr/local/sbin/"
+install -m 755 /root/scripts/tillsetup.py /usr/local/sbin/tillsetup
+
 echo " --> adding run-till script to till user's home directory"
-cat >/home/till/runtill <<EOF
-#!/bin/bash
-
-# This script invokes the till software and deals with any exit code.
-
-runtill -c \$(cat configname) -d "\$(cat database)" start \\
-  -e 0 "Exit / restart till software" \\
-  -e 2 "Power off till" \\
-  -e 3 "Reboot till" \\
-  -i 4
-tillexit=\$?
-sleep 2
-case "\$tillexit" in
-  0) exit ;;
-  2) sudo poweroff ;;
-  3) sudo reboot ;;
-esac
-sleep 1
-exit
-EOF
-chown till.till /home/till/runtill
-chmod 755 /home/till/runtill
+install -m 755 -o till -g till /root/scripts/runtill /home/till/runtill
 
 echo " --> updating till user's .profile"
-# Update the till user's .profile
-cat >>/home/till/.profile <<EOF
-
-# Start up till software automatically on tty1
-if [ "\$(tty)" = "/dev/tty1" ]; then
-  setfont /usr/share/consolefonts/\$(cat font)
-  sudo bash -c "source ./screenblank"
-  sudo apt-get update
-  sudo apt-get -y dist-upgrade
-  exec ./runtill
-fi
-EOF
+cat /root/scripts/profile-fragment >>/home/till/.profile
 
 echo " --> setting up autologin on tty1"
-cat >/usr/local/bin/login-till <<EOF
-#!/bin/bash
-
-# This file should be installed in /usr/local/bin
-
-echo Till login...
-stty -ixon -ixoff
-exec /bin/login -f till AUTORUN=yes
-EOF
-chmod +x /usr/local/bin/login-till
+install -m 755 /root/scripts/login-till /usr/local/bin/
 mkdir -p /etc/systemd/system/getty\@tty1.service.d
 cat >/etc/systemd/system/getty\@tty1.service.d/override.conf <<EOF
 [Service]
@@ -146,8 +105,11 @@ rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/23networking
 
-echo " --> installing extra requested packages"
-apt-get -y install $(cat /root/extrainstall)
+echo " --> installing extra requested packages without recommendations"
+apt-get -y --no-install-recommends install $(cat /root/extrainstall_norecommends)
+
+echo " --> installing extra requested packages with recommendations"
+apt-get -y install $(cat /root/extrainstall_recommends)
 
 echo " --> setting udev rules for printers"
 cat >/etc/udev/rules.d/60-epson.rules <<EOF
@@ -159,11 +121,22 @@ EOF
 echo " --> installing kernel"
 # The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
 # /proc is mounted during the kernel installation.
-apt-get -y --no-install-recommends install linux-generic-hwe-16.04
+apt-get -y --no-install-recommends install linux-generic
 
 echo " --> cleaning up package caches"
 # Clean up package caches
 apt-get clean
+rm /var/lib/apt/lists/*
 dpkg --clear-avail
+
+echo " --> masking units that make boot fail (XXX temporary fix for casper)"
+# See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1754777
+# Hopefully this will be fixed before bionic is released!
+systemctl mask dev-hugepages.mount
+systemctl mask dev-mqueue.mount
+systemctl mask sys-fs-fuse-connections.mount
+systemctl mask sys-kernel-config.mount
+systemctl mask sys-kernel-debug.mount
+systemctl mask tmp.mount
 
 echo "chroot-setup done"

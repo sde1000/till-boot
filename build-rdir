@@ -10,14 +10,17 @@ fi
 # Address of pub company's apt repository to be baked into the image
 repoaddr=http://www.individualpubs.co.uk/software
 
-distribution=xenial
+distribution=bionic
 
-arch=i386
+arch=amd64
 
 # Don't install quicktill; we fetch that on each boot because it may
 # be harmful to install an old version.  install=quicktill3 is needed
 # as a kernel command line argument.
-extrainstall="postgresql-client openssh-client ntp fbset acpid cups-bsd cups cups-browsed python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget man-db python3-dateutil"
+
+extrainstall_norecommends="postgresql-client openssh-client ntp acpid python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget man-db python3-dateutil"
+
+extrainstall_recommends="xinit python3-gi-cairo gir1.2-gtk-3.0 ttf-ubuntu-font-family xterm matchbox-window-manager x11-xserver-utils"
 
 target=./rdir
 
@@ -44,18 +47,20 @@ deb http://security.ubuntu.com/ubuntu $distribution-security main restricted uni
 deb $repoaddr $distribution-tills main
 EOF
 
+cp repo-signing-key.gpg $target/etc/apt/trusted.gpg.d/ipltd-repo-signing-key.asc
+
 # Copy the setup script into the target
-cp chroot-setup $target/root/
-cp repo-signing-key.gpg $target/root/
-echo $extrainstall >$target/root/extrainstall
+cp -r scripts $target/root/
+echo $extrainstall_norecommends >$target/root/extrainstall_norecommends
+echo $extrainstall_recommends >$target/root/extrainstall_recommends
 
 # Invoke the setup script in the target
-systemd-nspawn -D $target/ -a /root/chroot-setup
+systemd-nspawn -D $target/ -a /root/scripts/chroot-setup
 
 # Clean up
-rm $target/root/extrainstall
-rm $target/root/repo-signing-key.gpg
-rm $target/root/chroot-setup
+rm $target/root/extrainstall_norecommends
+rm $target/root/extrainstall_recommends
+rm -r $target/root/scripts
 
 # Leave only our private repository in the apt sources list
 cat >$target/etc/apt/sources.list <<EOF
@@ -64,14 +69,6 @@ deb-src $repoaddr $distribution-tills main
 EOF
 # Don't use our local proxy to fetch packages any more
 rm $target/etc/apt/apt.conf.d/40proxy
-
-# We need to copy the kernel and initrd to outside the target because
-# they will be installed on the network boot server.
-cp $target/vmlinuz till-vmlinuz
-chmod 644 till-vmlinuz
-# Grr, the symlink to the initrd image starts with a '/'
-chroot $target cp initrd.img foo
-mv $target/foo till-initrd.img
 
 # Zap /etc/resolv.conf - a new one will be generated on boot by casper
 rm -f $target/etc/resolv.conf
@@ -85,11 +82,6 @@ mv $target/etc/nsswitch.conf.new $target/etc/nsswitch.conf
 # we have to add it to /etc/modules here
 echo lp >>$target/etc/modules
 
-# Add the script that fetches the till configuration
-cp tillsetup.py $target/etc/init.d/tillsetup
-chmod +x $target/etc/init.d/tillsetup
-ln -s ../init.d/tillsetup $target/etc/rcS.d/S99tillsetup
-
 # Zap the machine ID so it's regenerated on each reboot
 rm $target/var/lib/dbus/machine-id
 
@@ -97,7 +89,7 @@ rm $target/var/lib/dbus/machine-id
 chroot $target dpkg-query -W --showformat='${Package} ${Version}\n' >filesystem.manifest
 # Diskdefines
 cat >README.diskdefines <<EOF
-#define DISKNAME  IPL Till Netboot Xenial
+#define DISKNAME  quicktill netboot Ubuntu Bionic
 #define TYPE  binary
 #define TYPEbinary  1
 #define ARCH  ${arch}

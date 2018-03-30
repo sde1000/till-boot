@@ -3,7 +3,6 @@ README.diskdefines
 rdir
 filesystem.manifest
 till-boot-*.deb
-till-boot
-till-initrd.img
-till-vmlinuz
-till.squashfs
+squashfs-package
+config-package
+

@@ -1,8 +1,40 @@
 #!/bin/bash
 
-# Depends:
-# pxelinux syslinux-common grub-efi-amd64-signed shim-signed grub-common
+# New plan: multiple netboot images can be installed at the same time
 
+# This is needed because terminals running using the loopback-mounted
+# squashfs that's read over NFS will become Very Confused if the
+# contents of the squashfs change underneath them.  The new squashfs
+# must have a different filename, and the old squashfs must not be
+# deleted until all the terminals have been rebooted.
+
+# So, how do we manage this?
+
+# Split the netboot images into two packages: One package contains the
+# squashfs, kernel and initrd (the kernel and initrd are extracted
+# from the squashfs by the postinst).  The package is named after its
+# version, eg. its name could be till-boot-bionic-201803160106.  The
+# other contains setup scripts and depends on the package containing
+# the squashfs; its name will be till-boot-bionic.
+
+# The kernel and initrd are compressed inside the squashfs, and need
+# to be extracted by the postinst.
+
+# squashfs package contents:
+# /usr/share/till-boot/bionic/$version/casper/till.squashfs
+# /usr/share/till-boot/bionic/$version/README.diskdefines
+# squashfs package postinst generates:
+# /var/lib/till-boot/bionic/version/vmlinuz
+# /var/lib/till-boot/bionic/version/initrd.img
+
+# generic package contents:
+# /etc/till-boot/{various conffiles}
+# /usr/bin/{script that puts files in the right places}
+# depends on things like pxelinux, shim-signed, etc. and
+# makes use of them
+
+# Build-Depends:
+# ipxe squashfs-tools
 set -e
 
 if [ ${UID} != 0 ]; then
@@ -10,45 +42,132 @@ if [ ${UID} != 0 ]; then
   exit 1
 fi
 
-target=till-boot
-tftpboot=$target/var/lib/tftpboot
-
+distribution=bionic
+arch=amd64
+source=rdir
 version=$(date +%Y%m%d%H%M%S)
 
+# Build the .deb containing the squashfs
+
+# Where to build the squashfs package
+target=squashfs-package
+usrshare_pkg=/usr/share/till-boot/$distribution/$arch/$version
+varlib_pkg=/var/lib/till-boot/$distribution/$arch/$version
+squashfs_pkg=$usrshare_pkg/casper/till.squashfs
+
+usrshare=${target}${usrshare_pkg}
+varlib=${target}${varlib_pkg}
+squashfs=${target}${squashfs_pkg}
+
 rm -rf $target
+mkdir -m 755 -p $usrshare/casper $varlib
+mksquashfs $source $squashfs -noappend
+chmod 644 $squashfs
+cp README.diskdefines ${usrshare}/
+cp filesystem.manifest ${usrshare}/
 
-mkdir -p $tftpboot/casper
+# The installed size will be the size of the files in /usr/share plus
+# the kernel and initrd once they are extracted from the squashfs
+size=$(du --total $usrshare $source/boot/initrd.img-* $source/boot/vmlinuz-* \
+	  | sed '$!d' | cut -f 1)
 
-cp /usr/lib/PXELINUX/pxelinux.0 $tftpboot/
-cp /usr/lib/syslinux/modules/bios/ldlinux.c32 $tftpboot/
-mkdir -p $tftpboot/pxelinux.cfg
-cp /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed $tftpboot/grubx64.efi
-cp /usr/lib/shim/shimx64.efi.signed $tftpboot/bootx64.efi
-mkdir -p $tftpboot/grub/fonts
-cp /usr/share/grub/unicode.pf2 $tftpboot/grub/fonts/
+mkdir -p $target/DEBIAN
+find $target -type f -print0 | xargs -0 md5sum >$target/DEBIAN/md5sums
+cat >$target/DEBIAN/control <<EOF
+Package: till-boot-${distribution}-${arch}-${version}
+Version: ${version}
+Architecture: all
+Maintainer: Stephen Early <steve@assorted.org.uk>
+Installed-Size: ${size}
+Depends: squashfs-tools
+Priority: optional
+Description: Filesystem, kernel and initrd for network boot for quicktill
+EOF
 
-mksquashfs rdir $tftpboot/casper/till-${version}.squashfs -noappend
-chmod 644 $tftpboot/casper/till-${version}.squashfs
-cp till-vmlinuz till-initrd.img filesystem.manifest README.diskdefines \
-    $tftpboot/
+cat >$target/DEBIAN/postinst <<EOF
+#!/bin/bash
+
+set -e
+
+# On configure, extract the kernel and initrd from the squashfs
+if [ "\$1" = "configure" ]; then
+  unsquashfs -n -d ${varlib_pkg}/tmp ${squashfs_pkg} "boot/initrd.img-*" "boot/vmlinuz-*"
+  mv ${varlib_pkg}/tmp/boot/initrd.img-* ${varlib_pkg}/initrd.img
+  mv ${varlib_pkg}/tmp/boot/vmlinuz-* ${varlib_pkg}/vmlinuz
+  chmod 644 ${varlib_pkg}/vmlinuz
+  rm -r ${varlib_pkg}/tmp
+fi
+EOF
+chmod 755 $target/DEBIAN/postinst
+
+cat >$target/DEBIAN/prerm <<EOF
+#!/bin/bash
+
+set -e
+
+# On upgrade or remove, delete the kernel and initrd that were extracted
+# from the squashfs by the postinst
+
+if [ \\( "\$1" = "upgrade" -o "\$1" = "remove" \\) ]; then
+  rm -f ${varlib_pkg}/initrd.img ${varlib_pkg}/vmlinuz
+  rm -rf ${varlib_pkg}/tmp
+fi
+EOF
+chmod 755 $target/DEBIAN/prerm
+
+dpkg-deb -Znone -b $target .
+
+
+# Build the till-boot package that deals with configuration and setup.
+# This package includes ipxe copied from the build system, so it's
+# usable on tills that are not amd64 architecture
+target=config-package
+share_pkg=/usr/share/till-boot/loaders/${arch}
+etc_pkg=/etc/till-boot
+sbin_pkg=/usr/sbin
+setup_script_pkg=${sbin_pkg}/till-boot-setup-${arch}
+
+share=${target}${share_pkg}
+etc=${target}${etc_pkg}
+sbin=${target}${sbin_pkg}
+setup_script=${target}${setup_script_pkg}
+
+rm -rf $target
+mkdir -m 755 -p $etc $sbin $share
+cp scripts/till-boot-setup.py $setup_script
+chmod 755 $setup_script
+
+cp /usr/lib/ipxe/ipxe.efi $share/
+cp /usr/lib/ipxe/ipxe.pxe $share/
 
 find $target -type f -print0 | xargs -0 md5sum >md5sums
 size=$(du -s $target | cut -f 1)
 mkdir -p $target/DEBIAN
 
 cat >$target/DEBIAN/control <<EOF
-Package: till-boot-xenial
+Package: till-boot-${distribution}-${arch}
 Version: ${version}
 Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
-Depends: tftpd-hpa, nfs-kernel-server, syslinux
-Conflicts: till-boot, till-boot-precise, till-boot-trusty
+Depends: till-boot-${distribution}-${arch}-${version}, tftpd-hpa, nfs-kernel-server, python3, python3-yaml
+Conflicts: till-boot-precise, till-boot-trusty, till-boot-xenial
+Replaces: till-boot-precise, till-boot-trusty, till-boot-xenial
 Priority: optional
-Description: Remote boot support for simple cash register software
- Developed for Individual Pubs Limited in the UK.
+Description: quicktill netboot for ${arch} clients
 EOF
+
+cat >$target/DEBIAN/postinst <<EOF
+#!/bin/bash
+
+set -e
+
+if [ "\$1" = "configure" ]; then
+  ${setup_script_pkg} ${distribution} ${arch} ${version}
+fi
+EOF
+chmod 755 $target/DEBIAN/postinst
 
 mv md5sums $target/DEBIAN/
 
-dpkg-deb -Znone -b $target .
+dpkg-deb -b $target .

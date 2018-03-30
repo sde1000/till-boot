@@ -1,0 +1,58 @@
+%YAML 1.1
+---
+# This file should usually be called /etc/till-boot/config
+
+# The configuration generator assumes that there is a DHCP server set up
+# with the following in its configuration file:
+
+# option arch code 93 = unsigned integer 16;
+# [...]
+# group {
+#   if exists user-class and option user-class = "iPXE" {
+#     filename = concat (host-decl-name, ".ipxe");
+#   } elsif option arch = 00:07 {
+#     filename "ipxe.efi";
+#   } else {
+#     filename "ipxe.pxe";
+#   }
+# [and then for every network booted till...]
+#   host test-till {
+#     hardware ethernet 08:00:27:db:57:9a;
+#     fixed-address test-till;
+#     next-server [the tftp server];
+#   }
+#
+# }
+
+# Configuration files will be generated for each network booted till
+# and made available on the TFTP server as [till-name].ipxe - so,
+# test-till.ipxe for the example above.
+
+# Location served by tftpd: we put config files here
+tftp-dir: /var/lib/tftpboot
+
+# Location served over nfs: squashfs is read from here
+nfs-dir: /usr/share/till-boot
+
+# Location of kernels and initrds extracted from squashfs
+boot-dir: /var/lib/till-boot
+
+# Address of NFS server serving squashfs
+nfs-server: 192.168.73.30
+
+# This list of options is appended to the kernel command line for all tills
+default-append:
+ - configurl=http://192.168.73.30/haymakers.py
+ - dbname=haymakers
+ - dbhost=192.168.73.30
+ - dbuser=steve
+ - install=quicktill3
+
+# The tills and their individual options are listed below.
+tills:
+  test-till:
+    configname: stockterminal
+
+  test-till-two:
+    append:
+     - configname=mainbar

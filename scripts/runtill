@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# This script invokes the till software and deals with any exit code.
+# It lives in /home/till/
+
+matchbox-window-manager -use_titlebar no -use_cursor no &
+xset s off
+runtill -u "$(cat configurl)" \
+	-c "$(cat configname)" \
+	-d "$(cat database)" \
+	start \
+	--gtk --fullscreen \
+	--font="sans $(cat fontsize)" \
+	--monospace-font="monospace $(cat fontsize)" \
+	-e 0 "Restart till software" \
+	-e 20 "Power off till" \
+	-e 30 "Reboot till" \
+	-i 40
+tillexit=$?
+case "$tillexit" in
+  0) exit ;;
+  20) sudo poweroff ;;
+  30) sudo reboot ;;
+  40) exit ;;
+esac
+sleep 1
+exit

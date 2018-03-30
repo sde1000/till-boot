@@ -2,4 +2,4 @@
 
 set -e
 
-rm -rf ./filesystem.manifest ./rdir ./README.diskdefines ./till-boot ./till-boot-trusty_*_all.deb ./till-initrd.img ./till-vmlinuz
+rm -rf ./filesystem.manifest ./rdir ./README.diskdefines ./config-package ./squashfs-package

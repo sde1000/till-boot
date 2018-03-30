@@ -1,0 +1,4 @@
+This directory contains scripts that are run either in the chroot as
+it is being built, or on the network-booted system.  These scripts
+should not be run directly on the host that is building the till-boot
+image.

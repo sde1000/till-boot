@@ -1,0 +1,10 @@
+# Start up till software automatically on tty1
+if [ "$(tty)" = "/dev/tty1" ]; then
+  /usr/local/sbin/tillsetup
+  sudo apt-get update
+  sudo apt-get -y dist-upgrade
+  if test -f install; then
+    sudo apt-get install $(cat install)
+  fi
+  exec startx ./runtill
+fi
