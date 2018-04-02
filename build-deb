@@ -63,8 +63,8 @@ rm -rf $target
 mkdir -m 755 -p $usrshare/casper $varlib
 mksquashfs $source $squashfs -noappend
 chmod 644 $squashfs
-cp README.diskdefines ${usrshare}/
-cp filesystem.manifest ${usrshare}/
+install -m 644 README.diskdefines ${usrshare}/
+install -m 644 filesystem.manifest ${usrshare}/
 
 # The installed size will be the size of the files in /usr/share plus
 # the kernel and initrd once they are extracted from the squashfs
@@ -125,20 +125,24 @@ target=config-package
 share_pkg=/usr/share/till-boot/loaders/${arch}
 etc_pkg=/etc/till-boot
 sbin_pkg=/usr/sbin
+doc_pkg=/usr/share/doc/till-boot
 setup_script_pkg=${sbin_pkg}/till-boot-setup-${arch}
 
 share=${target}${share_pkg}
 etc=${target}${etc_pkg}
 sbin=${target}${sbin_pkg}
+doc=${target}${doc_pkg}
 setup_script=${target}${setup_script_pkg}
 
 rm -rf $target
 mkdir -m 755 -p $etc $sbin $share
-cp scripts/till-boot-setup.py $setup_script
-chmod 755 $setup_script
+install -m 755 scripts/till-boot-setup.py $setup_script
 
-cp /usr/lib/ipxe/ipxe.efi $share/
-cp /usr/lib/ipxe/ipxe.pxe $share/
+mkdir -m 755 -p $doc
+install -m 644 example-config.yaml $doc/
+
+install -m 644 /usr/lib/ipxe/ipxe.efi $share/
+install -m 644 /usr/lib/ipxe/ipxe.pxe $share/
 
 find $target -type f -print0 | xargs -0 md5sum >md5sums
 size=$(du -s $target | cut -f 1)
@@ -163,7 +167,7 @@ cat >$target/DEBIAN/postinst <<EOF
 set -e
 
 if [ "\$1" = "configure" ]; then
-  ${setup_script_pkg} ${distribution} ${arch} ${version}
+  test -f /etc/till-boot/config && ${setup_script_pkg} ${distribution} ${arch} ${version} || echo "Config file /etc/till-boot/config not present - skipping config"
 fi
 EOF
 chmod 755 $target/DEBIAN/postinst

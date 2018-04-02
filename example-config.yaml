@@ -15,11 +15,13 @@
 #   } else {
 #     filename "ipxe.pxe";
 #   }
+#
+#   next-server [the tftp server];
+#
 # [and then for every network booted till...]
 #   host test-till {
 #     hardware ethernet 08:00:27:db:57:9a;
 #     fixed-address test-till;
-#     next-server [the tftp server];
 #   }
 #
 # }
@@ -44,9 +46,9 @@ nfs-server: 192.168.73.30
 default-append:
  - configurl=http://192.168.73.30/haymakers.py
  - dbname=haymakers
- - dbhost=192.168.73.30
+ - dbhost=192.168.73.30 # IP address or hostname
  - dbuser=steve
- - install=quicktill3
+ - install=quicktill3 # comma-separated list of packages
 
 # The tills and their individual options are listed below.
 tills:
