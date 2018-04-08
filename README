@@ -1,8 +1,8 @@
-We seem to have more luck running as real-root than fakeroot.
+Build debian packages for network booting of tills
 
-build-squashfs is just for testing.  Use build-deb to make the real
-package.
+These packages are installed on a server (usually, but not
+necessarily, the main till).
 
-Packages to install on the machine doing the building:
+You must be (real) root when running the build scripts.
 
-debootstrap squashfs-tools systemd-container pxelinux syslinux-common grub-efi-amd64-signed shim-signed grub-common
+debootstrap squashfs-tools systemd-container ipxe

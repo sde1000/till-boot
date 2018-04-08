@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Build-Depends:
+# ipxe
+set -e
+
+if [ ${UID} != 0 ]; then
+  echo "This script must be run as root."
+  exit 1
+fi
+
+version=$(date +%Y%m%d%H%M%S)
+
+target=loaders-package
+usrshare_pkg=/usr/share/till-boot/loaders
+
+usrshare=${target}${usrshare_pkg}
+
+rm -rf $target
+mkdir -m 755 -p $usrshare
+# XXX instead of copying from /usr/lib/ipxe it might be a better idea
+# to fetch upstream builds from https://boot.ipxe.org/
+install -m 644 /usr/lib/ipxe/ipxe.efi $usrshare/
+install -m 644 /usr/lib/ipxe/ipxe.pxe $usrshare/
+
+find $target -type f -print0 | xargs -0 md5sum >md5sums
+size=$(du -s $target | cut -f 1)
+mkdir -p $target/DEBIAN
+
+cat >$target/DEBIAN/control <<EOF
+Package: till-boot-loaders
+Version: ${version}
+Architecture: all
+Maintainer: Stephen Early <steve@assorted.org.uk>
+Installed-Size: ${size}
+Priority: optional
+Description: Bootloaders for quicktill netboot
+EOF
+
+mv md5sums $target/DEBIAN/
+
+dpkg-deb -b $target .

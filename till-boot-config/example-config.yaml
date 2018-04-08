@@ -34,13 +34,17 @@
 tftp-dir: /var/lib/tftpboot
 
 # Location served over nfs: squashfs is read from here
+# We expect subdirectories to be named distribution/arch/version
+# Versions are treated as integers; higher numbers are more recent
 nfs-dir: /usr/share/till-boot
 
 # Location of kernels and initrds extracted from squashfs
+# We expect subdirectories to be named distribution/arch/version
+# and within those, kernels to be named vmlinuz and initrds initrd.img
 boot-dir: /var/lib/till-boot
 
 # Address of NFS server serving squashfs
-nfs-server: 192.168.73.30
+nfs-server: 192.168.73.30 # IP address
 
 # This list of options is appended to the kernel command line for all tills
 default-append:
@@ -50,6 +54,12 @@ default-append:
  - dbuser=steve
  - install=quicktill3 # comma-separated list of packages
 
+defaults:
+  distribution: bionic
+  architecture: amd64
+  version: latest
+  configname: default
+
 # The tills and their individual options are listed below.
 tills:
   test-till:
@@ -58,3 +68,4 @@ tills:
   test-till-two:
     append:
      - configname=mainbar
+    architecture: i386

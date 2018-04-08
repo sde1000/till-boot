@@ -2,4 +2,4 @@
 
 set -e
 
-rm -rf ./filesystem.manifest ./rdir ./README.diskdefines ./config-package ./squashfs-package
+rm -rf ./rdir-* ./dep-package ./squashfs-package ./loaders-package

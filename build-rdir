@@ -2,6 +2,13 @@
 
 set -e
 
+arch=$1
+
+if [ "x$arch" = "x" ]; then
+  echo "Usage: build-rdir arch"
+  exit 1
+fi
+
 if [ ${UID} != 0 ]; then
   echo "This script must be run as root."
   exit 1
@@ -12,8 +19,6 @@ repoaddr=http://www.individualpubs.co.uk/software
 
 distribution=bionic
 
-arch=amd64
-
 # Don't install quicktill; we fetch that on each boot because it may
 # be harmful to install an old version.  install=quicktill3 is needed
 # as a kernel command line argument.
@@ -22,12 +27,13 @@ extrainstall_norecommends="postgresql-client openssh-client ntp acpid python3-ps
 
 extrainstall_recommends="xinit python3-gi-cairo gir1.2-gtk-3.0 ttf-ubuntu-font-family xterm matchbox-window-manager x11-xserver-utils"
 
-target=./rdir
+target=./rdir-${arch}
+manifest=${target}-filesystem.manifest
 
 export http_proxy=http://localhost:3142/
 source=http://gb.archive.ubuntu.com/ubuntu/
 
-rm -rf $target
+rm -rf $target $manifest
 mkdir $target
 
 debootstrap --arch=${arch} $distribution $target $source 2>&1
@@ -86,9 +92,10 @@ echo lp >>$target/etc/modules
 rm $target/var/lib/dbus/machine-id
 
 # Build the manifest file
-chroot $target dpkg-query -W --showformat='${Package} ${Version}\n' >filesystem.manifest
+chroot $target dpkg-query -W --showformat='${Package} ${Version}\n' >${manifest}
+
 # Diskdefines
-cat >README.diskdefines <<EOF
+cat >${target}-README.diskdefines <<EOF
 #define DISKNAME  quicktill netboot Ubuntu Bionic
 #define TYPE  binary
 #define TYPEbinary  1

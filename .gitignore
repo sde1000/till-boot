@@ -1,8 +1,7 @@
 *~
-README.diskdefines
-rdir
-filesystem.manifest
+rdir-*
 till-boot-*.deb
 squashfs-package
-config-package
-
+dep-package
+loaders-package
+till-boot-config_*

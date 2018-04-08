@@ -2,5 +2,8 @@
 
 set -e
 
-./build-rdir
-./build-deb
+./build-rdir amd64
+./build-rdir i386
+version=$(date +%Y%m%d%H%M%S)
+./build-deb amd64 ${version}
+./build-deb i386 ${version}

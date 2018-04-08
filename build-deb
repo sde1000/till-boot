@@ -34,8 +34,14 @@
 # makes use of them
 
 # Build-Depends:
-# ipxe squashfs-tools
+# squashfs-tools
 set -e
+
+arch=$1
+if [ "x${arch}" = "x" ]; then
+    echo "usage: build-deb arch"
+    exit 1
+fi
 
 if [ ${UID} != 0 ]; then
   echo "This script must be run as root."
@@ -43,9 +49,13 @@ if [ ${UID} != 0 ]; then
 fi
 
 distribution=bionic
-arch=amd64
-source=rdir
-version=$(date +%Y%m%d%H%M%S)
+arch=${arch}
+source=rdir-${arch}
+
+version=$2
+if [ "x${version}" = "x" ]; then
+    version=$(date +%Y%m%d%H%M%S)
+fi
 
 # Build the .deb containing the squashfs
 
@@ -63,8 +73,8 @@ rm -rf $target
 mkdir -m 755 -p $usrshare/casper $varlib
 mksquashfs $source $squashfs -noappend
 chmod 644 $squashfs
-install -m 644 README.diskdefines ${usrshare}/
-install -m 644 filesystem.manifest ${usrshare}/
+install -m 644 ${source}-README.diskdefines ${usrshare}/README.diskdefines
+install -m 644 ${source}-filesystem.manifest ${usrshare}/filesystem.manifest
 
 # The installed size will be the size of the files in /usr/share plus
 # the kernel and initrd once they are extracted from the squashfs
@@ -75,7 +85,7 @@ mkdir -p $target/DEBIAN
 find $target -type f -print0 | xargs -0 md5sum >$target/DEBIAN/md5sums
 cat >$target/DEBIAN/control <<EOF
 Package: till-boot-${distribution}-${arch}-${version}
-Version: ${version}
+Version: 1
 Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
@@ -91,7 +101,7 @@ set -e
 
 # On configure, extract the kernel and initrd from the squashfs
 if [ "\$1" = "configure" ]; then
-  unsquashfs -n -d ${varlib_pkg}/tmp ${squashfs_pkg} "boot/initrd.img-*" "boot/vmlinuz-*"
+  unsquashfs -n -d ${varlib_pkg}/tmp ${squashfs_pkg} "boot/initrd.img-*" "boot/vmlinuz-*" >/dev/null
   mv ${varlib_pkg}/tmp/boot/initrd.img-* ${varlib_pkg}/initrd.img
   mv ${varlib_pkg}/tmp/boot/vmlinuz-* ${varlib_pkg}/vmlinuz
   chmod 644 ${varlib_pkg}/vmlinuz
@@ -118,31 +128,12 @@ chmod 755 $target/DEBIAN/prerm
 dpkg-deb -Znone -b $target .
 
 
-# Build the till-boot package that deals with configuration and setup.
-# This package includes ipxe copied from the build system, so it's
-# usable on tills that are not amd64 architecture
-target=config-package
-share_pkg=/usr/share/till-boot/loaders/${arch}
-etc_pkg=/etc/till-boot
-sbin_pkg=/usr/sbin
-doc_pkg=/usr/share/doc/till-boot
-setup_script_pkg=${sbin_pkg}/till-boot-setup-${arch}
-
-share=${target}${share_pkg}
-etc=${target}${etc_pkg}
-sbin=${target}${sbin_pkg}
-doc=${target}${doc_pkg}
-setup_script=${target}${setup_script_pkg}
+# Build the till-boot package that depends on the version-specific
+# package we just built.
+target=dep-package
 
 rm -rf $target
-mkdir -m 755 -p $etc $sbin $share
-install -m 755 scripts/till-boot-setup.py $setup_script
-
-mkdir -m 755 -p $doc
-install -m 644 example-config.yaml $doc/
-
-install -m 644 /usr/lib/ipxe/ipxe.efi $share/
-install -m 644 /usr/lib/ipxe/ipxe.pxe $share/
+mkdir $target
 
 find $target -type f -print0 | xargs -0 md5sum >md5sums
 size=$(du -s $target | cut -f 1)
@@ -154,23 +145,12 @@ Version: ${version}
 Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
-Depends: till-boot-${distribution}-${arch}-${version}, tftpd-hpa, nfs-kernel-server, python3, python3-yaml
+Depends: till-boot-${distribution}-${arch}-${version}, till-boot-config
 Conflicts: till-boot-precise, till-boot-trusty, till-boot-xenial
 Replaces: till-boot-precise, till-boot-trusty, till-boot-xenial
 Priority: optional
 Description: quicktill netboot for ${arch} clients
 EOF
-
-cat >$target/DEBIAN/postinst <<EOF
-#!/bin/bash
-
-set -e
-
-if [ "\$1" = "configure" ]; then
-  test -f /etc/till-boot/config && ${setup_script_pkg} ${distribution} ${arch} ${version} || echo "Config file /etc/till-boot/config not present - skipping config"
-fi
-EOF
-chmod 755 $target/DEBIAN/postinst
 
 mv md5sums $target/DEBIAN/
 
