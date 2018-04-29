@@ -1,3 +1,9 @@
+till-boot-config (2) unstable; urgency=medium
+
+  * Prevent postinst from failing when script does nothing
+
+ -- Stephen Early <steve@assorted.org.uk>  Sun, 29 Apr 2018 20:26:00 +0100
+
 till-boot-config (1) unstable; urgency=medium
 
   * Initial Release.

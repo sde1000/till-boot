@@ -21,7 +21,7 @@ set -e
 case "$1" in
     configure|triggered)
 	echo Updating tftp boot files...
-	test -f /etc/till-boot/config && /usr/sbin/till-boot-config
+	test -f /etc/till-boot/config && /usr/sbin/till-boot-config || echo Not configured
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
