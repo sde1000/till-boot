@@ -5,17 +5,7 @@
 
 matchbox-window-manager -use_titlebar no -use_cursor no &
 xset s off
-runtill -u "$(cat configurl)" \
-	-c "$(cat configname)" \
-	-d "$(cat database)" \
-	start \
-	--gtk --fullscreen \
-	--font="sans $(cat fontsize)" \
-	--monospace-font="monospace $(cat fontsize)" \
-	-e 0 "Restart till software" \
-	-e 20 "Power off till" \
-	-e 30 "Reboot till" \
-	-i 40
+source runtill-command
 tillexit=$?
 case "$tillexit" in
   0) exit ;;

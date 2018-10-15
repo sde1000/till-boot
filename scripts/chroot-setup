@@ -129,6 +129,13 @@ apt-get clean
 rm /var/lib/apt/lists/*
 dpkg --clear-avail
 
+echo " --> moving private repo list to till home directory"
+# XXX once all sites have switched to providing runtime config over http
+# this can be left blank instead
+mv /etc/apt/sources.list.d/till-boot.list /home/till/apt-sources.list
+chown till.till /home/till/apt-sources.list
+ln -s /home/till/apt-sources.list /etc/apt/sources.list.d/till-boot.list
+
 echo " --> masking units that make boot fail (XXX temporary fix for casper)"
 # See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1754777
 # Hopefully this will be fixed before bionic is released!

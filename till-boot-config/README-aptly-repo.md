@@ -106,3 +106,22 @@ superceded.  You can do this using:
 ```
 aptly db cleanup
 ```
+
+
+Using the repository
+====================
+
+aptly will put the local repository in ~/.aptly/public - you should
+arrange for this to be served by the till configweb server.  Eg:
+
+```
+cd configweb
+ln -s ~/.aptly/public software
+```
+
+You can then add this to the till-boot config:
+
+```
+  repos:
+   - "deb [trusted=yes] http://192.168.73.30/software bionic-tills main"
+```

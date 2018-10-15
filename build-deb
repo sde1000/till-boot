@@ -145,7 +145,7 @@ Version: ${version}
 Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
-Depends: till-boot-${distribution}-${arch}-${version}, till-boot-config
+Depends: till-boot-${distribution}-${arch}-${version}, till-boot-config (>= 4)
 Conflicts: till-boot-precise, till-boot-trusty, till-boot-xenial
 Replaces: till-boot-precise, till-boot-trusty, till-boot-xenial
 Priority: optional

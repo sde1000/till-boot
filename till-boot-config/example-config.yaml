@@ -26,11 +26,16 @@
 #
 # }
 
-# Configuration files will be generated for each network booted till
-# and made available on the TFTP server as [till-name].ipxe - so,
+# Boot configuration files will be generated for each network booted
+# till and made available on the TFTP server as [till-name].ipxe - so,
 # test-till.ipxe for the example above.
 
-# Location served by tftpd: we put config files here
+# Runtime configuration files will be generated for each network
+# booted till and made available on the http server as
+# [till-name].yaml
+
+# Location served by tftpd: we put bootloaders, kernels, initrds and
+# boot config files here
 tftp-dir: /var/lib/tftpboot
 
 # Location served over nfs: squashfs is read from here
@@ -38,27 +43,40 @@ tftp-dir: /var/lib/tftpboot
 # Versions are treated as integers; higher numbers are more recent
 nfs-dir: /usr/share/till-boot
 
+# Bootloaders: all files here are copied to tftp-dir
+loaders-dir: /usr/share/till-boot/loaders
+
 # Location of kernels and initrds extracted from squashfs
 # We expect subdirectories to be named distribution/arch/version
 # and within those, kernels to be named vmlinuz and initrds initrd.img
 boot-dir: /var/lib/till-boot
 
+# Location served over http: run-time config is read from here
+http-dir: /var/lib/till-boot-config
+
 # Address of NFS server serving squashfs
 nfs-server: 192.168.73.30 # IP address
 
+# URL of http server serving run-time config
+http-server: http://192.168.73.30/till-boot/
+
 # This list of options is appended to the kernel command line for all tills
-default-append:
- - configurl=http://192.168.73.30/haymakers.py
- - dbname=haymakers
- - dbhost=192.168.73.30 # IP address or hostname
- - dbuser=steve
- - install=quicktill3 # comma-separated list of packages
+#default-append:
+# - not-usually-used
 
 defaults:
   distribution: bionic
   architecture: amd64
   version: latest
   configname: default
+  dbname: haymakers
+  dbhost: 192.168.73.30
+  dbuser: steve
+  install:
+   - quicktill3
+  fontsize: 12
+  repos:
+   - "deb [trusted=yes] http://192.168.73.30/software bionic-tills main"
 
 # The tills and their individual options are listed below.
 tills:
@@ -67,5 +85,11 @@ tills:
 
   test-till-two:
     append:
-     - configname=mainbar
+     - kernel-command-line-option-for-this-till-only
+     - video=LVDS-1:d
+    configname: mainbar
     architecture: i386
+    extra-install:
+     - python3-dali
+     - till-boot-disable-lvds
+    keyboard: yes

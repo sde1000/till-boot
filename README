@@ -5,4 +5,5 @@ necessarily, the main till).
 
 You must be (real) root when running the build scripts.
 
-debootstrap squashfs-tools systemd-container ipxe
+Required packages:
+debootstrap squashfs-tools systemd-container

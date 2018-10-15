@@ -9,7 +9,16 @@ import shutil
 import socket
 import logging
 
-log = logging.getLogger("till-boot-setup")
+log = logging.getLogger("till-boot-config")
+
+def path_or_fail(path, desc):
+    if not path:
+        log.critical("%s not specified", desc)
+        sys.exit(1)
+    return Path(path)
+
+def path_or_none(path):
+    return Path(path) if path else None
 
 def run():
     parser = argparse.ArgumentParser("Set up networked boot for quicktill")
@@ -20,6 +29,7 @@ def run():
     parser.add_argument("--boot-dir",
                         help="override kernel+initrd dir location")
     parser.add_argument("--loaders-dir", help="override loaders loction")
+    parser.add_argument("--http-dir", help="override http dir location")
     parser.add_argument("--verbose", "-v", help="output more information "
                         "about operation", action="store_true")
     args = parser.parse_args()
@@ -33,19 +43,17 @@ def run():
     
     # Read the configuration
     with open(args.config_file) as f:
-        config = yaml.load(f)
+        config = yaml.safe_load(f)
 
-    nfs_dir = Path(args.nfs_dir or config["nfs-dir"])
-    tftp_dir = Path(args.tftp_dir or config["tftp-dir"])
-    boot_dir = Path(args.boot_dir or config["boot-dir"])
-    loaders_dir = nfs_dir / 'loaders'
-    if args.loaders_dir:
-        ald = Path(args.loaders_dir)
-        if ald.is_absolute():
-            loaders_dir = ald
-        else:
-            loaders_dir = loaders_dir / ald
-    config_dir = tftp_dir
+    nfs_dir = path_or_fail(args.nfs_dir or config["nfs-dir"], "nfs-dir")
+    tftp_dir = path_or_fail(args.tftp_dir or config["tftp-dir"], "tftp-dir")
+    boot_dir = path_or_fail(args.boot_dir or config["boot-dir"], "boot-dir")
+    http_dir = path_or_none(args.http_dir or config.get("http-dir", None))
+    http_server = config.get("http-server", [])
+    loaders_dir = path_or_none(args.loaders_dir or config.get(
+        "loaders-dir", None))
+    if not loaders_dir:
+        loaders_dir = nfs_dir / 'loaders'
 
     default_append = config.get("default-append", [])
 
@@ -68,8 +76,19 @@ def run():
         log.critical("boot files directory %s doesn't exist", boot_dir)
         sys.exit(1)
 
-    # Create the config dir if it doesn't exist
-    config_dir.mkdir(mode=0o755, exist_ok=True)
+    # If http_dir is specified it should exist and be a directory,
+    # and http_server must be specified
+    if http_dir:
+        if not http_dir.is_dir():
+            log.critical("http dir %s doesn't exist", http_dir)
+            sys.exit(1)
+        if not http_dir.is_absolute():
+            log.warning("http dir %s is relative", http_dir)
+        if not http_server:
+            log.critical("http-dir is specified, but http-server is not")
+            sys.exit(1)
+        if http_server[-1] != '/':
+            http_server = http_server + '/'
 
     # Make sure the loaders are copied into the tftp dir
     if not loaders_dir.is_dir():
@@ -128,7 +147,7 @@ def run():
         settings = defaults.copy()
         settings.update(till_settings)
 
-        cf = config_dir / "{}.ipxe".format(till)
+        cf = tftp_dir / "{}.ipxe".format(till)
         distribution = settings.get("distribution")
         arch = settings.get("architecture")
         version = settings.get("version")
@@ -153,6 +172,9 @@ def run():
             kfile = "vmlinuz-{}-{}-{}".format(distribution, arch, version)
             ifile = "initrd-{}-{}-{}.img".format(distribution, arch, version)
 
+        # Update the settings with the actual version selected
+        settings["version"] = version
+
         # Copy the kernel and initrd into place if this has not
         # already been done
         if not catalog[(distribution, arch, version)]:
@@ -169,12 +191,19 @@ def run():
             "initrd={}".format(ifile),
             "netboot=nfs",
             "nfsroot={}:{}".format(config["nfs-server"], nfs_root_dir),
-            "boot=casper"
+            "boot=casper",
         ]
+        http_config_append = [
+            "till-boot-version={}".format(version),
+            "till-boot-config={}{}.yaml".format(http_server, till),
+        ]
+        if http_dir:
+            append += http_config_append
         append += default_append
         append += settings.get("append", [])
-        # Shorthand, because I keep getting it wrong!
-        if "configname" in settings:
+        # Shorthand for append of configname in older till-boot configurations
+        # with no http-based run-time config
+        if not http_dir and "configname" in settings:
             append.append("configname={}".format(settings["configname"]))
 
         # From python3.6 onward this can be written open(cf, 'w')
@@ -186,9 +215,16 @@ def run():
             f.write("kernel {} {} || chain ipxe.pxe\n".format(
                 kfile, " ".join(append)))
             f.write("initrd {}\n".format(ifile))
-            #f.write("imgstat\n")
-            #f.write("sleep 10\n")
             f.write("boot\n")
+
+        if http_dir:
+            hf = http_dir / "{}.yaml".format(till)
+            with hf.open('w') as f:
+                f.write("%YAML 1.1\n")
+                f.write("---\n")
+                f.write("# This file was auto-generated by {} for {}; "
+                         "do not edit\n".format(sys.argv[0], till))
+                yaml.dump(settings, f)
 
 if __name__ == "__main__":
     run()
