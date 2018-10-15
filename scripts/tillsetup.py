@@ -117,7 +117,10 @@ def tillconfig(config):
         f.write('  start \\\n')
         f.write('  --gtk --fullscreen \\\n')
         if "keyboard" in config:
-            f.write('  --keyboard \\\n')
+            if config["keyboard"] != "no":
+                f.write('  --keyboard \\\n')
+            if config["keyboard"] == "onscreen-only":
+                f.write('  --no-hardware-keyboard \\\n')
         f.write('  --font="sans {}" \\\n'.format(fontsize))
         f.write('  --monospace-font="monospace {}" \\\n'.format(fontsize))
         f.write('  -e 0 "Restart till software" \\\n')
