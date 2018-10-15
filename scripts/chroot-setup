@@ -115,7 +115,9 @@ echo " --> setting udev rules for printers"
 cat >/etc/udev/rules.d/60-epson.rules <<EOF
 # Epson receipt printer
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0e03", SYMLINK+="epson-tm-t20"
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0e15", SYMLINK+="epson-tm-t20ii"
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0202", SYMLINK+="epson-tm-u220"
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a700", SYMLINK+="aures-odp-333"
 EOF
 
 echo " --> installing kernel"
