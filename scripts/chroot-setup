@@ -101,6 +101,9 @@ EOF
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
 rm -f /usr/share/initramfs-tools/scripts/casper-bottom/10adduser
 rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
+# See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1755863 for
+# the below...
+rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25disable_cdrom.mount
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/15autologin
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
 #rm -f /usr/share/initramfs-tools/scripts/casper-bottom/23networking
@@ -137,15 +140,5 @@ echo " --> moving private repo list to till home directory"
 mv /etc/apt/sources.list.d/till-boot.list /home/till/apt-sources.list
 chown till.till /home/till/apt-sources.list
 ln -s /home/till/apt-sources.list /etc/apt/sources.list.d/till-boot.list
-
-echo " --> masking units that make boot fail (XXX temporary fix for casper)"
-# See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1754777
-# Hopefully this will be fixed before bionic is released!
-systemctl mask dev-hugepages.mount
-systemctl mask dev-mqueue.mount
-systemctl mask sys-fs-fuse-connections.mount
-systemctl mask sys-kernel-config.mount
-systemctl mask sys-kernel-debug.mount
-systemctl mask tmp.mount
 
 echo "chroot-setup done"
