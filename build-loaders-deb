@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Build-Depends:
-# ipxe
 set -e
 
 if [ ${UID} != 0 ]; then
@@ -18,10 +16,6 @@ usrshare=${target}${usrshare_pkg}
 
 rm -rf $target
 mkdir -m 755 -p $usrshare
-# XXX instead of copying from /usr/lib/ipxe it might be a better idea
-# to fetch upstream builds from https://boot.ipxe.org/
-#install -m 644 /usr/lib/ipxe/ipxe.efi $usrshare/
-#install -m 644 /usr/lib/ipxe/ipxe.pxe $usrshare/
 wget https://boot.ipxe.org/ipxe.efi -O $usrshare/ipxe.efi
 wget https://boot.ipxe.org/ipxe.pxe -O $usrshare/ipxe.pxe
 
