@@ -108,6 +108,11 @@ def tillconfig(config):
 
     fontsize = config.get("fontsize", "20")
 
+    pointer = config.get("pointer", "no")
+
+    with open("pointer", "w") as f:
+        f.write("{}\n".format(pointer))
+
     with open("runtill-command", "w") as f:
         f.write("runtill \\\n")
         if "configurl" in config:
