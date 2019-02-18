@@ -5,6 +5,16 @@ if [ "$(tty)" = "/dev/tty1" ]; then
     sleep 30
     sudo reboot
   fi
+  if test -f maintenance-message ; then
+    echo "System is in maintenance mode; till will not be started."
+    echo -n "Last checked: "
+    date
+    echo
+    cat maintenance-message
+    echo
+    sleep 30
+    exit
+  fi
   sudo apt-get update
   sudo apt-get -y dist-upgrade
   if test -f install; then
