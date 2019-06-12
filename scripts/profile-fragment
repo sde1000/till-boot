@@ -17,6 +17,9 @@ if [ "$(tty)" = "/dev/tty1" ]; then
   fi
   sudo apt-get update
   sudo apt-get -y dist-upgrade
+  if test -f printserver; then
+    sudo ./set-printserver.sh
+  fi
   if test -f install; then
     sudo apt-get install $(cat install)
   fi

@@ -125,6 +125,12 @@ def tillconfig(config):
     with open("pointer", "w") as f:
         f.write("{}\n".format(pointer))
 
+    printserver = config.get("printserver", None)
+
+    if printserver:
+        with open("printserver", "w") as f:
+            f.write("{}\n".format(printserver))
+
     with open("runtill-command", "w") as f:
         f.write("runtill \\\n")
         if "configurl" in config:
