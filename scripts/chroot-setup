@@ -129,7 +129,7 @@ EOF
 echo " --> installing kernel"
 # The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
 # /proc is mounted during the kernel installation.
-apt-get -y --no-install-recommends install linux-generic
+apt-get -y --no-install-recommends install linux-generic-hwe-18.04
 
 echo " --> cleaning up package caches"
 # Clean up package caches
