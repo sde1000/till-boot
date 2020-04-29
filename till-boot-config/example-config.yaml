@@ -73,7 +73,9 @@ defaults:
   dbhost: 192.168.73.30
   dbuser: steve
   install:
-   - quicktill3
+   - quicktill-nfc-bridge
+   - ipl-timesheets
+   - quicktill16
   fontsize: 12
   repos:
    - "deb [trusted=yes] http://192.168.73.30/software bionic-tills main"

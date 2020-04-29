@@ -27,7 +27,6 @@ Import the signing key for the main repository:
 ```
 gpg --no-default-keyring --keyring trustedkeys.gpg --import <<EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----
-Version: GnuPG v1.4.11 (GNU/Linux)
 
 mQENBFMGAY8BCAC6h3oq6oK48d8bxMc7jsKKuW/E/ZohmtDaeLsbyIs7+R0oTBPY
 Ey9GyzVrBJqnOSzGd0PV9/EGMyXL+JpNMv4H5llemLJkYXFqZJrdpZDcTFJheXUL
@@ -47,6 +46,12 @@ CFpI8sgLtA6KH6kTAr4vvc5qk0pOGo4y4iQOMPn6JtT1uc9l
 -----END PGP PUBLIC KEY BLOCK-----
 EOF
 ```
+
+NB if you previously imported the key under Ubuntu 18.04, delete
+~/.gnupg/trustedkeys.gpg and import again; there was a bug in gnupg in
+Ubuntu 18.04 that corrupted the key on import leading to error
+messages like `gpgv: keydb_search failed: invalid packet` under Ubuntu
+20.04.
 
 Optionally create a key to sign the local repository.  This isn't
 strictly necessary: the network booted tills have to trust their boot
