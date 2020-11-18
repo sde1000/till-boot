@@ -21,7 +21,7 @@ if [ "$(tty)" = "/dev/tty1" ]; then
     sudo ./set-printserver.sh
   fi
   if test -f install; then
-    sudo apt-get install $(cat install)
+    sudo apt-get -y install $(cat install)
   fi
   exec startx ./runtill
 fi

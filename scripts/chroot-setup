@@ -9,10 +9,14 @@ test -e /root/scripts/chroot-setup || exit 1
 
 echo "Start of chroot-setup"
 
+source /etc/os-release
+
 export DEBIAN_FRONTEND=noninteractive
 
 echo " --> generating locales"
+apt-get -y install locales
 locale-gen en_GB.UTF-8
+
 echo " --> setting timezone"
 debconf-set-selections <<EOF
 tzdata tzdata/Areas select Europe
@@ -30,8 +34,22 @@ apt-get -y install dbus
 echo " --> doing dist-upgrade"
 apt-get -y dist-upgrade
 
-echo " --> installing network-manager and casper"
-apt-get --no-install-recommends -y install network-manager casper
+case "${ID}" in
+    raspbian|debian)
+	echo " --> enabling systemd-networkd and systemd-resolved"
+	systemctl enable systemd-networkd
+	systemctl enable systemd-resolved
+	echo " --> installing live-boot"
+	apt-get -y install live-boot
+	;;
+    ubuntu)
+	echo " --> installing network-manager"
+	apt-get --no-install-recommends -y install network-manager
+
+	echo " --> installing casper"
+	apt-get --no-install-recommends -y install casper
+	;;
+esac
 
 echo " --> choosing UK keyboard"
 # Choose a UK keyboard...
@@ -93,23 +111,31 @@ ExecStart=
 ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/local/bin/login-till --noclear %I \$TERM
 EOF
 
-echo " --> zapping unhelpful bits of casper"
-# Zap bits of casper that are doing unhelpful things!
-cat >/etc/casper.conf <<EOF
+case "${ID}" in
+    raspbian|debian)
+	echo " --> setting up live-boot and live-config"
+	echo "     (nothing to do)"
+	;;
+    ubuntu)
+	echo " --> zapping unhelpful bits of casper"
+	# Zap bits of casper that are doing unhelpful things!
+	cat >/etc/casper.conf <<EOF
 USERNAME=
 USERFULLNAME=
 HOST=till
 BUILD_SYSTEM=Ubuntu
 EOF
-#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
-rm -f /usr/share/initramfs-tools/scripts/casper-bottom/10adduser
-rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
-# See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1755863 for
-# the below...
-rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25disable_cdrom.mount
-#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/15autologin
-#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
-#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/23networking
+	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
+	rm -f /usr/share/initramfs-tools/scripts/casper-bottom/10adduser
+	rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
+	# See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1755863 for
+	# the below...
+	rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25disable_cdrom.mount
+	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/15autologin
+	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
+	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/23networking
+	;;
+esac
 
 echo " --> installing extra requested packages without recommendations"
 apt-get -y --no-install-recommends install $(cat /root/extrainstall_norecommends)
@@ -127,20 +153,44 @@ SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a700", SYMLINK
 EOF
 
 echo " --> installing kernel"
-# The kernel installer checks /proc/cpuinfo for PAE support.  Make sure
-# /proc is mounted during the kernel installation.
-apt-get -y --no-install-recommends install linux-generic-hwe-18.04
+case "${ID}" in
+    raspbian)
+	apt-get -y install raspberrypi-kernel raspberrypi-bootloader
+	# The kernel is probably already installed, but we need to reconfigure
+	# the package to generate the initrds...
+	cat >/etc/default/raspberrypi-kernel <<EOF
+# Defaults for raspberrypi-kernel
+
+# Uncomment the following line to enable generation of
+# /boot/initrd.img-KVER files (requires initramfs-tools)
+
+INITRD=Yes
+
+# Uncomment the following line to enable generation of
+# /boot/initrd(7).img files (requires rpi-initramfs-tools)
+
+#RPI_INITRD=Yes
+
+EOF
+	dpkg-reconfigure raspberrypi-kernel
+	;;
+    debian)
+	apt-get -y --no-install-recommends install linux-image-$(dpkg --print-architecture)
+	;;
+    ubuntu)
+	apt-get -y --no-install-recommends install linux-generic-hwe-18.04
+	;;
+esac
 
 echo " --> cleaning up package caches"
 # Clean up package caches
 apt-get clean
-rm /var/lib/apt/lists/*
+rm -rf /var/lib/apt/lists/*
 dpkg --clear-avail
 
-echo " --> moving private repo list to till home directory"
-# XXX once all sites have switched to providing runtime config over http
-# this can be left blank instead
-mv /etc/apt/sources.list.d/till-boot.list /home/till/apt-sources.list
+echo " --> setting up private repo list in till home directory"
+rm -f /etc/apt/sources.list.d/till-boot.list
+echo -n >/home/till/apt-sources.list
 chown till.till /home/till/apt-sources.list
 ln -s /home/till/apt-sources.list /etc/apt/sources.list.d/till-boot.list
 

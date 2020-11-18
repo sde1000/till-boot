@@ -30,10 +30,7 @@ def run():
             continue
         config[xs[0]] = i[len(xs[0]) + 1:]
 
-    if "till-boot-version" in config:
-        current(config)
-    else:
-        legacy(config)
+    current(config)
 
 def bail(problem):
     print(problem)
@@ -41,7 +38,9 @@ def bail(problem):
 
 def current(cmdline_config):
     boot_version = cmdline_config["till-boot-version"]
-    boot_config = cmdline_config.get("till-boot-config", None)
+    if not boot_version:
+        bail("till-boot-version kernel command line parameter not set")
+    boot_config = cmdline_config.get("till-boot-config")
     if not boot_config:
         bail("till-boot-config kernel command line parameter not set")
     try:
@@ -57,7 +56,7 @@ def current(cmdline_config):
         config = yaml.safe_load(r.text)
     except Exception as e:
         print(e)
-        bail("problem reading configuration from {}".format(r.url))
+        bail(f"problem reading configuration from {r.url}")
 
     if "version" not in config:
         bail("no 'version' key present in configuration")
@@ -66,6 +65,9 @@ def current(cmdline_config):
     # command line and the run-time config read over http.  We can see
     # whether we need to reboot to pick up an updated boot image.
     if boot_version != config["version"]:
+        print(f"Current boot image version: {boot_version}")
+        print(f"Available boot image version: {config['version']}")
+        print("")
         print("An updated boot image is available for this till.")
         print("Rebooting to load it.")
         time.sleep(5)
@@ -92,14 +94,6 @@ def current(cmdline_config):
     with open("install", "w") as f:
         install = config.get("install", []) + config.get("extra-install", [])
         f.write("{}\n".format(" ".join(install)))
-
-    # Continue with till config
-    tillconfig(config)
-
-def legacy(config):
-    if "install" in config:
-        with open("install", 'w') as f:
-            f.write("{}\n".format(" ".join(config["install"].split(","))))
 
     # Continue with till config
     tillconfig(config)

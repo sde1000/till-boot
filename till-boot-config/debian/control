@@ -4,12 +4,9 @@ Priority: optional
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Build-Depends: debhelper (>= 9)
 Standards-Version: 3.9.8
-#Homepage: <insert the upstream URL, if relevant>
-#Vcs-Git: https://anonscm.debian.org/collab-maint/till-boot-config.git
-#Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/till-boot-config.git
 
 Package: till-boot-config
 Architecture: all
-Depends: till-boot-loaders, python3-yaml, tftpd-hpa, nfs-kernel-server, ${misc:Depends}
+Depends: python3 (>=3.6), till-boot-loaders, python3-yaml, tftpd-hpa, nfs-kernel-server, ${misc:Depends}
 Description: Configuration script for network booted tills
  Script that builds tftpboot config for network booted tills

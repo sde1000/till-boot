@@ -1,9 +1,18 @@
 #!/bin/bash
 
+# Build images for all platforms and architectures
+
 set -e
 
-./build-rdir amd64
-./build-rdir i386
+parallel --progress --bar <<EOF
+./build-rdir pc bionic amd64 rdir-pc-amd64
+./build-rdir pc bionic i386 rdir-pc-i386
+./build-rdir rpi buster armhf rdir-rpi-armhf
+EOF
+
 version=$(date +%Y%m%d%H%M%S)
-./build-deb amd64 ${version}
-./build-deb i386 ${version}
+./build-deb pc amd64 casper rdir-pc-amd64 ${version}
+./build-deb pc i386 casper rdir-pc-i386 ${version}
+./build-deb rpi armhf live rdir-rpi-armhf ${version}
+
+./build-loaders-deb ${version}

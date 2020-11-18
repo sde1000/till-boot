@@ -6,4 +6,22 @@ necessarily, the main till).
 You must be (real) root when running the build scripts.
 
 Required packages:
-debootstrap squashfs-tools systemd-container
+debootstrap squashfs-tools systemd-container qemu-user-static binfmt-support wget parallel
+
+
+Terms used:
+
+"platform": the type of computer to be booted.  Platforms vary in
+their requirements for boot files and their placement: for example,
+the 'pc' platform uses ipxe, boot-time config is placed into
+'hostname.ipxe' files, and the DHCP server points the client at the
+appropriate file.  The 'rpi' platform uses the PI's own network
+bootloader; boot-time config and supporting files are placed into a
+subdirectory named according to the serial number of the PI to be
+booted.
+
+Current platforms are 'pc' and 'rpi'.
+
+"distribution": the codename of the debian-derived operating system,
+eg. 'xenial', 'bionic', 'focal' for Ubuntu, 'buster' for debian or
+raspberry pi os

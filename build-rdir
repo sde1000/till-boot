@@ -2,64 +2,184 @@
 
 set -e
 
-arch=$1
-
-if [ "x$arch" = "x" ]; then
-  echo "Usage: build-rdir arch"
-  exit 1
+if [ "$#" != "4" ]; then
+    echo "Usage: build-rdir platform distribution arch target"
+    exit 1
 fi
+
+platform=$1
+distribution=$2
+arch=$3
+target=$4
 
 if [ ${UID} != 0 ]; then
   echo "This script must be run as root."
   exit 1
 fi
 
-echo Building rdir for $arch
+# Common configuration
 
-# Address of pub company's apt repository to be baked into the image
-repoaddr=http://www.individualpubs.co.uk/software
+extrainstall_norecommends="postgresql-client openssh-client ntp acpid python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget man-db python3-dateutil"
 
-distribution=bionic
+extrainstall_recommends="xinit python3-gi-cairo gir1.2-gtk-3.0 fonts-ubuntu fonts-symbola xterm matchbox-window-manager x11-xserver-utils python3-pil"
 
-# Don't install quicktill; we fetch that on each boot because it may
-# be harmful to install an old version.  install=quicktill3 is needed
-# as a kernel command line argument.
+# Address of tills apt repository, used during image creation to fetch
+# the quicktill-nfc-bridge package
+repoaddr=http://quicktill.assorted.org.uk/software
+repokey=keys/quicktill-repo.gpg.key
 
-extrainstall_norecommends="postgresql-client openssh-client ntp acpid python3-psycopg2 python3-reportlab python3-httplib2 python3-qrcode python3-sqlalchemy python3-yaml quicktill-nfc-bridge oidentd usbutils pciutils python3-cups python3-odf telnet strace tcpdump python3-twython python3-oauthlib python3-requests python3-matplotlib wget man-db python3-dateutil dmidecode"
+# HTTP proxy to use as a cache; this should be configured to cache .deb files
+export http_proxy=http://sinister.sinister.greenend.org.uk:8000/
 
-extrainstall_recommends="xinit python3-gi-cairo gir1.2-gtk-3.0 fonts-ubuntu fonts-symbola xterm matchbox-window-manager x11-xserver-utils python3-pil xserver-xorg-hwe-18.04"
+# Platform-dependent configuration
 
-target=./rdir-${arch}
+if [ "${platform}" = "pc" ]; then
+    extrainstall_norecommends="${extrainstall_norecommends} dmidecode"
+    case ${distribution} in
+	bionic|focal)
+	    source=http://gb.archive.ubuntu.com/ubuntu/
+	    debootstrap_keyring=
+	    boot=casper
+	    extrainstall_recommends="${extrainstall_recommends} xserver-xorg-hwe-18.04"
+	    function setup_pre_chroot {
+		cat >$target/etc/apt/sources.list <<EOF
+deb http://gb.archive.ubuntu.com/ubuntu $distribution main restricted universe multiverse
+deb http://gb.archive.ubuntu.com/ubuntu $distribution-updates main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu $distribution-security main restricted universe multiverse
+EOF
+	    }
+	    function setup_post_chroot {
+		# For some reason the "lp" module is not loaded
+		# automatically, so we have to add it to /etc/modules
+		# here
+		echo lp >>$target/etc/modules
+	    }
+	    ;;
+	buster)
+	    source=http://deb.debian.org/debian/
+	    debootstrap_keyring=
+	    boot=live
+	    extrainstall_recommends="${extrainstall_recommends} sudo"
+	    function setup_pre_chroot {
+		cat >$target/etc/apt/sources.list <<EOF
+deb http://deb.debian.org/debian/ $distribution main contrib non-free
+deb-src http://deb.debian.org/debian/ $distribution main contrib non-free
+
+deb http://security.debian.org/debian-security $distribution/updates main contrib non-free
+deb-src http://security.debian.org/debian-security $distribution/updates main contrib non-free
+
+deb http://deb.debian.org/debian/ $distribution-updates main contrib non-free
+deb-src http://deb.debian.org/debian/ $distribution-updates main contrib non-free
+EOF
+	    }
+	    function setup_post_chroot {
+		# For some reason the "lp" module is not loaded
+		# automatically, so we have to add it to /etc/modules
+		# here
+		echo lp >>$target/etc/modules
+	    }
+	    ;;
+	*)
+	    echo "Unknown pc distribution ${distribution}"
+	    exit 1
+	    ;;
+    esac
+fi
+
+if [ "${platform}" = "rpi" ]; then
+    extrainstall_recommends="${extrainstall_recommends} libraspberrypi-bin sudo"
+    source=http://raspbian.raspberrypi.org/raspbian/
+    boot=live
+
+    echo Creating keyring using raspbian.public.key
+    rpi_keyring=$(tempfile --suffix=.gpg)
+    debootstrap_keyring="--keyring ${rpi_keyring}"
+    apt-key ${debootstrap_keyring} add keys/raspbian.public.key
+    function setup_pre_chroot {
+	cat >$target/etc/apt/sources.list <<EOF
+deb http://raspbian.raspberrypi.org/raspbian/ ${distribution} main contrib non-free rpi
+deb http://archive.raspberrypi.org/debian/ ${distribution} main
+EOF
+	# Raspberry kernels and bootloaders are in a separate repo with its own key
+	cp keys/raspberrypi.gpg.key $target/etc/apt/trusted.gpg.d/raspberrypi-key.asc
+    }
+    function setup_post_chroot {
+	# Add a systemd-networkd config file
+	cat >$target/etc/systemd/network/till.network <<EOF
+[Match]
+Name=eth0
+Virtualization=false
+
+[Network]
+DHCP=true
+
+[DHCP]
+UseDNS=true
+EOF
+	# Prevent sudo from looking up the fqdn every time and failing
+	cat >$target/etc/sudoers.d/nolookup <<EOF
+Defaults !fqdn
+EOF
+    }
+fi
+
+# Work out whether we are cross-building
+crossbuild=true
+if [ "${arch}" = "$(dpkg --print-architecture)" ]; then
+    crossbuild=
+fi
+if [ "${arch}" = "$(dpkg --print-foreign-architectures)" ]; then
+    crossbuild=
+fi
+
+echo Building ${platform} ${distribution}-${arch} chroot in ${target}
+
 manifest=${target}-filesystem.manifest
 diskdefines=${target}-README.diskdefines
+imginfo=${target}-image-info.yaml
 
-export http_proxy=http://localhost:3142/
-source=http://gb.archive.ubuntu.com/ubuntu/
-
-rm -rf $target $manifest $diskdefines
+rm -rf $target $manifest $diskdefines $imginfo
 mkdir $target
 
 echo Running debootstrap
-debootstrap --arch=${arch} $distribution $target $source 2>&1
+if [ $crossbuild ]; then
+    qemu-debootstrap ${debootstrap_keyring} --arch=${arch} $distribution $target $source 2>&1
+#    case "${arch}" in
+#	arm64)
+#	    cp /usr/bin/qemu-aarch64-static ${target}/usr/bin/
+#	    ;;
+#	armhf)
+#	    cp /usr/bin/qemu-arm-static ${target}/usr/bin/
+#	    ;;
+#	amd64|i386)
+#	    cp /usr/bin/qemu-i386-static ${target}/usr/bin/
+#	    ;;
+#    esac
+else
+    debootstrap ${debootstrap_keyring} --arch=${arch} $distribution $target $source 2>&1
+fi
 
 # Seed the target with some useful files
 cat >$target/etc/default/locale <<EOF
 LANG="en_GB.UTF-8"
 EOF
 
-cat >$target/etc/apt/apt.conf.d/40proxy <<EOF
+# Use the http proxy if configured
+if [ "${http_proxy}" ]; then
+    cat >$target/etc/apt/apt.conf.d/40proxy <<EOF
 Acquire::http::Proxy "$http_proxy";
 EOF
-cat >$target/etc/apt/sources.list <<EOF
-deb http://gb.archive.ubuntu.com/ubuntu $distribution main restricted universe multiverse
-deb http://gb.archive.ubuntu.com/ubuntu $distribution-updates main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu $distribution-security main restricted universe multiverse
-EOF
-cat >$target/etc/apt/sources.list.d/till-boot.list <<EOF
-deb $repoaddr $distribution-tills main
-EOF
+fi
 
-cp repo-signing-key.gpg $target/etc/apt/trusted.gpg.d/ipltd-repo-signing-key.asc
+# Override the default hostname
+echo till >$target/etc/hostname
+
+# Tills repository to fetch quicktill-nfc-bridge package (and other
+# till-related packages to be baked into the image)
+cat >$target/etc/apt/sources.list.d/till-boot.list <<EOF
+deb $repoaddr tills main
+EOF
+cp $repokey $target/etc/apt/trusted.gpg.d/repo-signing-key.asc
 
 # Copy the setup script into the target
 cp -r scripts $target/root/
@@ -67,7 +187,10 @@ echo $extrainstall_norecommends >$target/root/extrainstall_norecommends
 echo $extrainstall_recommends >$target/root/extrainstall_recommends
 
 # Invoke the setup script in the target
+setup_pre_chroot
+rm -f $target/etc/resolv.conf
 systemd-nspawn -D $target/ -a /root/scripts/chroot-setup
+setup_post_chroot
 
 # Clean up
 rm $target/root/extrainstall_norecommends
@@ -77,10 +200,11 @@ rm -r $target/root/scripts
 # Clear the apt sources list
 cat >$target/etc/apt/sources.list <<EOF
 EOF
-# Don't use our local proxy to fetch packages any more
-rm $target/etc/apt/apt.conf.d/40proxy
 
-# Zap /etc/resolv.conf - a new one will be generated on boot by casper
+# Don't use our local proxy (if any) to fetch packages any more
+rm -f $target/etc/apt/apt.conf.d/40proxy
+
+# Zap /etc/resolv.conf - a new one will be generated on boot
 rm -f $target/etc/resolv.conf
 
 # The diskless terminal thinks it is called "till".  The real till is
@@ -88,19 +212,19 @@ rm -f $target/etc/resolv.conf
 sed "s/^hosts:.*$/hosts: mdns4_minimal \\[NOTFOUND=return] dns files/" <$target/etc/nsswitch.conf >$target/etc/nsswitch.conf.new
 mv $target/etc/nsswitch.conf.new $target/etc/nsswitch.conf
 
-# For some reason the "lp" module is not loaded automatically, so
-# we have to add it to /etc/modules here
-echo lp >>$target/etc/modules
-
 # Zap the machine ID so it's regenerated on each reboot
 rm $target/var/lib/dbus/machine-id
+
+# XXX Are the manifest and diskdefines necessary?  Does casper
+# complain if they are missing?
 
 # Build the manifest file
 chroot $target dpkg-query -W --showformat='${Package} ${Version}\n' >${manifest}
 
-# Diskdefines
-cat >${diskdefines} <<EOF
-#define DISKNAME  quicktill netboot Ubuntu Bionic
+if [ "${boot}" = "casper" ]; then
+  # Diskdefines
+  cat >${diskdefines} <<EOF
+#define DISKNAME  quicktill
 #define TYPE  binary
 #define TYPEbinary  1
 #define ARCH  ${arch}
@@ -110,3 +234,27 @@ cat >${diskdefines} <<EOF
 #define TOTALNUM  0
 #define TOTALNUM0  1
 EOF
+fi
+
+# Image info file
+cat >${imginfo} <<EOF
+%YAML 1.1
+---
+platform: ${platform}
+distribution: ${distribution}
+architecture: ${arch}
+append:
+ - boot=${boot}
+EOF
+if [ "${platform}" = "rpi" ]; then
+    cat >>${imginfo} <<EOF
+ - console=tty1
+ - net.ifnames=0
+ - ethdevice-timeout=30
+config-pi4:
+  - dtoverlay=vc4-fkms-v3d
+  - max_framebuffers=2
+config:
+  - dtoverlay=audio=on
+EOF
+fi

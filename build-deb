@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# New plan: multiple netboot images can be installed at the same time
+# Multiple netboot images can be installed at the same time
 
 # This is needed because terminals running using the loopback-mounted
 # squashfs that's read over NFS will become Very Confused if the
@@ -8,90 +8,62 @@
 # must have a different filename, and the old squashfs must not be
 # deleted until all the terminals have been rebooted.
 
-# So, how do we manage this?
-
-# Split the netboot images into two packages: One package contains the
-# squashfs, kernel and initrd (the kernel and initrd are extracted
-# from the squashfs by the postinst).  The package is named after its
-# version, eg. its name could be till-boot-bionic-201803160106.  The
-# other contains setup scripts and depends on the package containing
-# the squashfs; its name will be till-boot-bionic.
-
-# The kernel and initrd are compressed inside the squashfs, and need
-# to be extracted by the postinst.
-
-# squashfs package contents:
-# /usr/share/till-boot/bionic/$version/casper/till.squashfs
-# /usr/share/till-boot/bionic/$version/README.diskdefines
-# squashfs package postinst generates:
-# /var/lib/till-boot/bionic/version/vmlinuz
-# /var/lib/till-boot/bionic/version/initrd.img
-
-# generic package contents:
-# /etc/till-boot/{various conffiles}
-# /usr/bin/{script that puts files in the right places}
-# depends on things like pxelinux, shim-signed, etc. and
-# makes use of them
-
 # Build-Depends:
 # squashfs-tools
 set -e
 
-arch=$1
-if [ "x${arch}" = "x" ]; then
-    echo "usage: build-deb arch"
+if [ "$#" != "5" ]; then
+    echo "usage: build-deb platform arch boot-type source-dir version"
     exit 1
 fi
+
+platform=$1
+arch=$2
+boot=$3
+source=$4
+version=$5
 
 if [ ${UID} != 0 ]; then
   echo "This script must be run as root."
   exit 1
 fi
 
-distribution=bionic
-arch=${arch}
-source=rdir-${arch}
-
-version=$2
-if [ "x${version}" = "x" ]; then
-    version=$(date +%Y%m%d%H%M%S)
-fi
-
 # Build the .deb containing the squashfs
 
 # Where to build the squashfs package
-target=squashfs-package
-usrshare_pkg=/usr/share/till-boot/$distribution/$arch/$version
-varlib_pkg=/var/lib/till-boot/$distribution/$arch/$version
-squashfs_pkg=$usrshare_pkg/casper/till.squashfs
+target=squashfs-package-${platform}-${arch}-${version}
+usrshare_pkg=/usr/share/till-boot/${platform}/${arch}/${version}
+varlib_pkg=/var/lib/till-boot/${platform}/${arch}/${version}
+squashfs_pkg=${usrshare_pkg}/${boot}/till.squashfs
 
 usrshare=${target}${usrshare_pkg}
 varlib=${target}${varlib_pkg}
 squashfs=${target}${squashfs_pkg}
 
 rm -rf $target
-mkdir -m 755 -p $usrshare/casper $varlib
+mkdir -m 755 -p $usrshare/${boot} $varlib
 mksquashfs $source $squashfs -noappend
 chmod 644 $squashfs
-install -m 644 ${source}-README.diskdefines ${usrshare}/README.diskdefines
-install -m 644 ${source}-filesystem.manifest ${usrshare}/filesystem.manifest
+for i in ${source}-* ; do
+    tail=${i#"${source}-"}
+    install -m 644 ${i} ${usrshare}/${tail}
+done
 
 # The installed size will be the size of the files in /usr/share plus
-# the kernel and initrd once they are extracted from the squashfs
-size=$(du --total $usrshare $source/boot/initrd.img-* $source/boot/vmlinuz-* \
-	  | sed '$!d' | cut -f 1)
+# the /boot tree once they are extracted from the squashfs
+size=$(du --total $usrshare $source/boot/ | sed '$!d' | cut -f 1)
 
 mkdir -p $target/DEBIAN
 find $target -type f -print0 | xargs -0 md5sum >$target/DEBIAN/md5sums
 cat >$target/DEBIAN/control <<EOF
-Package: till-boot-${distribution}-${arch}-${version}
+Package: till-boot-${platform}-${arch}-${version}
 Version: 1
 Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
 Depends: squashfs-tools
 Priority: optional
-Description: Filesystem, kernel and initrd for network boot for quicktill
+Description: quicktill netboot for ${platform}-${arch} clients
 EOF
 
 cat >$target/DEBIAN/postinst <<EOF
@@ -99,13 +71,13 @@ cat >$target/DEBIAN/postinst <<EOF
 
 set -e
 
-# On configure, extract the kernel and initrd from the squashfs
+# On configure, extract the boot files from the squashfs
 if [ "\$1" = "configure" ]; then
-  unsquashfs -n -d ${varlib_pkg}/tmp ${squashfs_pkg} "boot/initrd.img-*" "boot/vmlinuz-*" >/dev/null
-  mv ${varlib_pkg}/tmp/boot/initrd.img-* ${varlib_pkg}/initrd.img
-  mv ${varlib_pkg}/tmp/boot/vmlinuz-* ${varlib_pkg}/vmlinuz
-  chmod 644 ${varlib_pkg}/vmlinuz
-  rm -r ${varlib_pkg}/tmp
+  unsquashfs -n -d ${varlib_pkg}/tmp ${squashfs_pkg} "boot/*" >/dev/null
+  # Make sure everything is readable
+  chmod -R a+rX ${varlib_pkg}/tmp/boot
+  mv ${varlib_pkg}/tmp/boot ${varlib_pkg}/
+  rm -rf ${varlib_pkg}/tmp
 fi
 EOF
 chmod 755 $target/DEBIAN/postinst
@@ -115,12 +87,11 @@ cat >$target/DEBIAN/prerm <<EOF
 
 set -e
 
-# On upgrade or remove, delete the kernel and initrd that were extracted
+# On upgrade or remove, delete the boot files that were extracted
 # from the squashfs by the postinst
 
 if [ \\( "\$1" = "upgrade" -o "\$1" = "remove" \\) ]; then
-  rm -f ${varlib_pkg}/initrd.img ${varlib_pkg}/vmlinuz
-  rm -rf ${varlib_pkg}/tmp
+  rm -rf ${varlib_pkg}/boot ${varlib_pkg}/tmp
 fi
 EOF
 chmod 755 $target/DEBIAN/prerm
@@ -130,7 +101,7 @@ dpkg-deb -Znone -b $target .
 
 # Build the till-boot package that depends on the version-specific
 # package we just built.
-target=dep-package
+target=dep-package-${platform}-${arch}-${version}
 
 rm -rf $target
 mkdir $target
@@ -140,16 +111,14 @@ size=$(du -s $target | cut -f 1)
 mkdir -p $target/DEBIAN
 
 cat >$target/DEBIAN/control <<EOF
-Package: till-boot-${distribution}-${arch}
+Package: till-boot-${platform}-${arch}
 Version: ${version}
 Architecture: all
 Maintainer: Stephen Early <steve@assorted.org.uk>
 Installed-Size: ${size}
-Depends: till-boot-${distribution}-${arch}-${version}, till-boot-config (>= 4)
-Conflicts: till-boot-precise, till-boot-trusty, till-boot-xenial
-Replaces: till-boot-precise, till-boot-trusty, till-boot-xenial
+Depends: till-boot-${platform}-${arch}-${version}, till-boot-config (>= 5)
 Priority: optional
-Description: quicktill netboot for ${arch} clients
+Description: quicktill netboot for ${platform}-${arch} clients
 EOF
 
 mv md5sums $target/DEBIAN/
