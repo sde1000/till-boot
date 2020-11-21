@@ -4,15 +4,18 @@
 
 set -e
 
+pc_distro=buster
+#pc_distro=bionic
+
 parallel --progress --bar <<EOF
-./build-rdir pc bionic amd64 rdir-pc-amd64
-./build-rdir pc bionic i386 rdir-pc-i386
-./build-rdir rpi buster armhf rdir-rpi-armhf
+./build-rdir pc $pc_distro amd64 rdir-pc-amd64 >rdir-pc-amd64-buildlog 2>&1
+./build-rdir pc $pc_distro i386 rdir-pc-i386 >rdir-pc-i386-buildlog 2>&1
+./build-rdir rpi buster armhf rdir-rpi-armhf >rdir-rpi-armhf-buildlog 2>&1
 EOF
 
 version=$(date +%Y%m%d%H%M%S)
-./build-deb pc amd64 casper rdir-pc-amd64 ${version}
-./build-deb pc i386 casper rdir-pc-i386 ${version}
-./build-deb rpi armhf live rdir-rpi-armhf ${version}
+./build-deb pc amd64 rdir-pc-amd64 ${version}
+./build-deb pc i386 rdir-pc-i386 ${version}
+./build-deb rpi armhf rdir-rpi-armhf ${version}
 
 ./build-loaders-deb ${version}

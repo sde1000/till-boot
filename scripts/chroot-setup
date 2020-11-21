@@ -14,8 +14,13 @@ source /etc/os-release
 export DEBIAN_FRONTEND=noninteractive
 
 echo " --> generating locales"
-apt-get -y install locales
-locale-gen en_GB.UTF-8
+debconf-set-selections <<EOF
+locales	locales/locales_to_be_generated	multiselect	en_GB.UTF-8 UTF-8, en_US.UTF-8 UTF-8
+locales	locales/default_environment_locale	select	en_GB.UTF-8
+EOF
+apt-get -q -y install locales
+dpkg-reconfigure -u locales
+#locale-gen
 
 echo " --> setting timezone"
 debconf-set-selections <<EOF
@@ -26,13 +31,13 @@ echo Europe/London >/etc/timezone
 dpkg-reconfigure -u tzdata
 
 echo " --> refreshing package cache"
-apt-get update
+apt-get -q update
 
 echo " --> installing dbus"
-apt-get -y install dbus
+apt-get -q -y install dbus
 
 echo " --> doing dist-upgrade"
-apt-get -y dist-upgrade
+apt-get -q -y dist-upgrade
 
 case "${ID}" in
     raspbian|debian)
@@ -40,14 +45,14 @@ case "${ID}" in
 	systemctl enable systemd-networkd
 	systemctl enable systemd-resolved
 	echo " --> installing live-boot"
-	apt-get -y install live-boot
+	apt-get -q -y install live-boot
 	;;
     ubuntu)
 	echo " --> installing network-manager"
-	apt-get --no-install-recommends -y install network-manager
+	apt-get -q --no-install-recommends -y install network-manager
 
 	echo " --> installing casper"
-	apt-get --no-install-recommends -y install casper
+	apt-get -q --no-install-recommends -y install casper
 	;;
 esac
 
@@ -138,10 +143,10 @@ EOF
 esac
 
 echo " --> installing extra requested packages without recommendations"
-apt-get -y --no-install-recommends install $(cat /root/extrainstall_norecommends)
+apt-get -q -y --no-install-recommends install $(cat /root/extrainstall_norecommends)
 
 echo " --> installing extra requested packages with recommendations"
-apt-get -y install $(cat /root/extrainstall_recommends)
+apt-get -q -y install $(cat /root/extrainstall_recommends)
 
 echo " --> setting udev rules for printers"
 cat >/etc/udev/rules.d/60-epson.rules <<EOF
@@ -155,7 +160,7 @@ EOF
 echo " --> installing kernel"
 case "${ID}" in
     raspbian)
-	apt-get -y install raspberrypi-kernel raspberrypi-bootloader
+	apt-get -q -y install raspberrypi-kernel raspberrypi-bootloader
 	# The kernel is probably already installed, but we need to reconfigure
 	# the package to generate the initrds...
 	cat >/etc/default/raspberrypi-kernel <<EOF
@@ -175,16 +180,26 @@ EOF
 	dpkg-reconfigure raspberrypi-kernel
 	;;
     debian)
-	apt-get -y --no-install-recommends install linux-image-$(dpkg --print-architecture)
+	case $(dpkg --print-architecture) in
+	    amd64)
+		apt-get -q -y --no-install-recommends install linux-image-amd64
+		;;
+	    i386)
+		apt-get -q -y --no-install-recommends install linux-image-686
+		;;
+	    *)
+		echo "Don't know which kernel package to install for this arch"
+		;;
+	esac
 	;;
     ubuntu)
-	apt-get -y --no-install-recommends install linux-generic-hwe-18.04
+	apt-get -q -y --no-install-recommends install linux-generic-hwe-18.04
 	;;
 esac
 
 echo " --> cleaning up package caches"
 # Clean up package caches
-apt-get clean
+apt-get -q clean
 rm -rf /var/lib/apt/lists/*
 dpkg --clear-avail
 
