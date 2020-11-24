@@ -11,7 +11,10 @@ echo "Start of chroot-setup"
 
 source /etc/os-release
 
-export DEBIAN_FRONTEND=noninteractive
+# Don't ask any questions...
+debconf-set-selections <<EOF
+debconf	debconf/frontend	select	Noninteractive
+EOF
 
 echo " --> generating locales"
 debconf-set-selections <<EOF
@@ -20,7 +23,6 @@ locales	locales/default_environment_locale	select	en_GB.UTF-8
 EOF
 apt-get -q -y install locales
 dpkg-reconfigure -u locales
-#locale-gen
 
 echo " --> setting timezone"
 debconf-set-selections <<EOF

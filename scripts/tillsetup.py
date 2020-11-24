@@ -75,6 +75,17 @@ def current(cmdline_config):
         time.sleep(60)
         bail("did not reboot in time!")
 
+    ntp = "ntp-server"
+    if config.get(ntp):
+        with open(ntp, "w") as f:
+            f.write(config[ntp])
+            f.write("\n")
+    else:
+        try:
+            os.unlink(ntp)
+        except FileNotFoundError:
+            pass
+
     mm = "maintenance-message"
     if config.get(mm):
         with open(mm, "w") as f:
@@ -95,10 +106,6 @@ def current(cmdline_config):
         install = config.get("install", []) + config.get("extra-install", [])
         f.write("{}\n".format(" ".join(install)))
 
-    # Continue with till config
-    tillconfig(config)
-
-def tillconfig(config):
     dbstring = []
     if "dbname" in config:
         dbstring.append("dbname=" + config["dbname"])
