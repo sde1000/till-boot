@@ -4,8 +4,8 @@
 
 set -e
 
-pc_distro=buster
-#pc_distro=bionic
+#pc_distro=buster
+pc_distro=bionic
 
 parallel --progress --bar <<EOF
 ./build-rdir pc $pc_distro amd64 rdir-pc-amd64 >rdir-pc-amd64-buildlog 2>&1

@@ -112,8 +112,9 @@ class pc(_platform):
             self.installed = True
 
         append = self.get_append(settings)
-        # XXX Is this necessary?
-        #append.append(f"initrd={ifile}")
+        # Including the initrd filename on the kernel command line is
+        # necessary for EFI systems and harmless on others.
+        append.append(f"initrd={ifile}")
         append += default_append
         append += settings.get("append", [])
 

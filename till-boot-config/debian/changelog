@@ -1,3 +1,9 @@
+till-boot-config (7) stable; urgency=medium
+
+  * Include initrd= on pc kernel command line: necessary for EFI
+
+ -- Stephen Early <steve@assorted.org.uk>  Thu, 26 Nov 2020 15:16:04 +0100
+
 till-boot-config (6) stable; urgency=medium
 
   * New platform/arch/version configuration scheme

@@ -22,6 +22,7 @@ locales	locales/locales_to_be_generated	multiselect	en_GB.UTF-8 UTF-8, en_US.UTF
 locales	locales/default_environment_locale	select	en_GB.UTF-8
 EOF
 apt-get -q -y install locales
+rm -f /etc/locale.gen # Needed on Ubuntu
 dpkg-reconfigure -u locales
 
 echo " --> setting timezone"

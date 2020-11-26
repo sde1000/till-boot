@@ -2,4 +2,4 @@
 
 set -e
 
-rm -rf ./rdir-* ./dep-package-* ./squashfs-package-* ./loaders-package
+rm -rf ./rdir-* ./rdir-*.boot ./dep-package-* ./squashfs-package-* ./loaders-package
