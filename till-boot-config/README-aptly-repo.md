@@ -9,7 +9,7 @@ dependencies on remote repositories.
 You can serve this local repository using the same web server that
 serves the till configuration file.  Manage the local repository as
 the same user that owns the till configuration file, and symlink from
-the directory served by the web server to ~/.aptly/public/
+the directory served by the web server to `~/.aptly/public/`
 
 Initial setup
 =============
@@ -52,7 +52,7 @@ EOF
 ```
 
 NB if you previously imported the key under Ubuntu 18.04, delete
-~/.gnupg/trustedkeys.gpg and import again; there was a bug in gnupg in
+`~/.gnupg/trustedkeys.gpg` and import again; there was a bug in gnupg in
 Ubuntu 18.04 that corrupted the key on import leading to error
 messages like `gpgv: keydb_search failed: invalid packet` under Ubuntu
 20.04.
@@ -85,7 +85,7 @@ aptly publish repo \
 ```
 
 (If you want to sign the published repository, see the relevant
-options at (the aptly documentation page for aptly publish repo)[https://www.aptly.info/doc/aptly/publish/repo/].)
+options at [the aptly documentation page for aptly publish repo](https://www.aptly.info/doc/aptly/publish/repo/).)
 
 
 Updating the repository
@@ -112,7 +112,7 @@ aptly db cleanup
 Using the repository
 ====================
 
-aptly will put the local repository in ~/.aptly/public - you should
+aptly will put the local repository in `~/.aptly/public` — you should
 arrange for this to be served by the till configweb server.  Eg:
 
 ```
