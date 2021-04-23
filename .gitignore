@@ -1,7 +1,7 @@
 *~
-rdir-*
-till-boot-*.deb
-squashfs-package
-dep-package
+/rdir-*
+/till-boot-*.deb
+/squashfs-package-*
+/dep-package-*
 loaders-package
 till-boot-config_*

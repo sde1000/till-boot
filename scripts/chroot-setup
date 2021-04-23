@@ -160,6 +160,14 @@ SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0202", SYMLINK
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a700", SYMLINK+="aures-odp-333"
 EOF
 
+LIBCCID_CONFIG=/etc/libccid_Info.plist
+if [ -f ${LIBCCID_CONFIG} ] ; then
+    echo " --> updating libccid config"
+    # set ifdDriverOptions to 0x0001 so quicktill-nfc-bridge can disable
+    # card reader beeps
+    /root/scripts/update-libccid-config.py ${LIBCCID_CONFIG} ${LIBCCID_CONFIG}
+fi
+
 echo " --> installing kernel"
 case "${ID}" in
     raspbian)
