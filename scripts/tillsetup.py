@@ -11,6 +11,36 @@ import subprocess
 import yaml
 import os
 
+_true_strings = (
+    'y', 'Y', 'yes', 'Yes', 'YES', 'true', 'True', 'TRUE', 'on', 'On', 'ON')
+_false_strings = (
+    'n', 'N', 'no', 'No', 'NO', 'false', 'False', 'FALSE', 'off', 'Off', 'OFF')
+
+def get_boolean(d, k, default=None):
+    # There is some confusion in yaml regarding whether unquoted
+    # 'yes', 'no', etc. get turned into strings or booleans. The
+    # specification changed between yaml 1.1 and 1.2. Depending on how
+    # whoever wrote the configuration file quoted their options, we
+    # may end up with a real boolean, or one of the _true_strings or
+    # _false_strings above (which are taken from the yaml 1.1
+    # spec). Or possibly something else!
+
+    # We return the default if the key is not present. If one of the
+    # _true_strings or _false_strings is present we return True or
+    # False. Otherwise we return the contents of the key unchanged.
+    if k not in d:
+        return default
+    i = d[k]
+    if i in _true_strings:
+        return True
+    if i in _false_strings:
+        return False
+    return i
+
+def bail(problem):
+    print(problem)
+    sys.exit(1)
+
 def run():
     try:
         with open("tillsetup-cmdline") as f:
@@ -22,22 +52,15 @@ def run():
             testing = False
 
     words = cmdline.split()
-    config = {}
+    cmdline_config = {}
 
     for i in words:
         xs = i.split('=')
         if len(xs) < 2:
             continue
-        config[xs[0]] = i[len(xs[0]) + 1:]
+        cmdline_config[xs[0]] = i[len(xs[0]) + 1:]
 
-    current(config)
-
-def bail(problem):
-    print(problem)
-    sys.exit(1)
-
-def current(cmdline_config):
-    boot_version = cmdline_config["till-boot-version"]
+    boot_version = cmdline_config.get("till-boot-version")
     if not boot_version:
         bail("till-boot-version kernel command line parameter not set")
     boot_config = cmdline_config.get("till-boot-config")
@@ -47,10 +70,9 @@ def current(cmdline_config):
         r = requests.get(boot_config)
     except Exception as e:
         print(e)
-        bail("exception fetching config from {}".format(boot_config))
+        bail(f"exception fetching config from {boot_config}")
     if r.status_code != 200:
-        bail("response code {} fetching config from {}".format(
-            r.status_code, r.url))
+        bail(f"response code {r.status_code} fetching config from {r.url}")
 
     try:
         config = yaml.safe_load(r.text)
@@ -100,11 +122,11 @@ def current(cmdline_config):
     # Add apt respositories
     with open("apt-sources.list", "w") as f:
         for r in config.get("repos", []):
-            f.write("{}\n".format(r))
+            f.write(f"{r}\n")
 
     with open("install", "w") as f:
         install = config.get("install", []) + config.get("extra-install", [])
-        f.write("{}\n".format(" ".join(install)))
+        f.write(f"{' '.join(install)}\n")
 
     dbstring = []
     if "dbname" in config:
@@ -121,32 +143,33 @@ def current(cmdline_config):
 
     fontsize = config.get("fontsize", "20")
 
-    pointer = config.get("pointer", "no")
+    pointer = get_boolean(config, "pointer", default=False)
 
     with open("pointer", "w") as f:
-        f.write("{}\n".format(pointer))
+        f.write(f"{'yes' if pointer else 'no'}\n")
 
     printserver = config.get("printserver", None)
 
     if printserver:
         with open("printserver", "w") as f:
-            f.write("{}\n".format(printserver))
+            f.write(f"{printserver}\n")
 
     with open("runtill-command", "w") as f:
         f.write("runtill \\\n")
         if "configurl" in config:
-            f.write('  -u "{}" \\\n'.format(config["configurl"]))
-        f.write('  -c "{}" \\\n'.format(configname))
-        f.write('  -d "{}" \\\n'.format(database))
+            f.write(f'  -u "{config["configurl"]}" \\\n')
+        f.write(f'  -c "{configname}" \\\n')
+        f.write(f'  -d "{database}" \\\n')
         f.write('  start \\\n')
         f.write('  --gtk --fullscreen \\\n')
-        if "keyboard" in config:
-            if config["keyboard"] != "no":
-                f.write('  --keyboard \\\n')
-            if config["keyboard"] == "onscreen-only":
+        # yaml awkwardness: 'keyboard' may be a boolean or a string
+        keyboard = get_boolean(config, "keyboard", default=True)
+        if keyboard:
+            f.write('  --keyboard \\\n')
+            if keyboard == "onscreen-only":
                 f.write('  --no-hardware-keyboard \\\n')
-        f.write('  --font="sans {}" \\\n'.format(fontsize))
-        f.write('  --monospace-font="monospace {}" \\\n'.format(fontsize))
+        f.write(f'  --font="sans {fontsize}" \\\n')
+        f.write(f'  --monospace-font="monospace {fontsize}" \\\n')
         f.write('  -e 0 "Restart till software" \\\n')
         f.write('  -e 20 "Power off till" \\\n')
         f.write('  -e 30 "Reboot till" \\\n')
