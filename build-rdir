@@ -55,7 +55,7 @@ EOF
 		echo lp >>$target/etc/modules
 	    }
 	    ;;
-	buster)
+	buster|bullseye)
 	    source=http://deb.debian.org/debian/
 	    debootstrap_keyring=
 	    boot=live
