@@ -55,7 +55,7 @@ done
 size=$(du --total $usrshare $source/boot/ | sed '$!d' | cut -f 1)
 
 mkdir -p $target/DEBIAN
-find $target -type f -print0 | xargs -0 md5sum >$target/DEBIAN/md5sums
+find $target -type f -not -path '*/DEBIAN/*' -printf '%P\0' | (cd $target ; xargs -0 md5sum) >$target/DEBIAN/md5sums
 cat >$target/DEBIAN/control <<EOF
 Package: till-boot-${platform}-${arch}-${version}
 Version: 1
@@ -106,10 +106,9 @@ target=dep-package-${platform}-${arch}-${version}
 
 rm -rf $target
 mkdir $target
-
-find $target -type f -print0 | xargs -0 md5sum >md5sums
 size=$(du -s $target | cut -f 1)
 mkdir -p $target/DEBIAN
+echo -n >$target/DEBIAN/md5sums  # No files in package
 
 cat >$target/DEBIAN/control <<EOF
 Package: till-boot-${platform}-${arch}
@@ -121,7 +120,5 @@ Depends: till-boot-${platform}-${arch}-${version}, till-boot-config (>= 5)
 Priority: optional
 Description: quicktill netboot for ${platform}-${arch} clients
 EOF
-
-mv md5sums $target/DEBIAN/
 
 dpkg-deb -b $target .

@@ -24,9 +24,9 @@ wget https://boot.ipxe.org/ipxe.efi -O $usrshare/ipxe.efi
 wget https://boot.ipxe.org/ipxe.pxe -O $usrshare/ipxe.pxe
 wget https://github.com/raspberrypi/firmware/raw/master/boot/bootcode.bin -O $usrshare/bootcode.bin
 
-find $target -type f -print0 | xargs -0 md5sum >md5sums
 size=$(du -s $target | cut -f 1)
 mkdir -p $target/DEBIAN
+find $target -type f -not -path '*/DEBIAN/*' -printf '%P\0' | (cd $target ; xargs -0 md5sum) >$target/DEBIAN/md5sums
 
 cat >$target/DEBIAN/control <<EOF
 Package: till-boot-loaders
@@ -37,7 +37,5 @@ Installed-Size: ${size}
 Priority: optional
 Description: Bootloaders for quicktill netboot
 EOF
-
-mv md5sums $target/DEBIAN/
 
 dpkg-deb -b $target .
