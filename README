@@ -29,7 +29,7 @@ debian or raspberry pi os
 
 Currently working:
 
-pc bionic {i386,amd64}
+pc focal amd64
 pc buster {i386,amd64}
 pc bullseye {i386,amd64}
 rpi buster armhf
@@ -37,7 +37,7 @@ rpi bullseye {armhf,arm64}
 
 Currently not working:
 
-pc focal amd64 (fails to pick up IP address on boot)
+pc bionic {i386,amd64} (freezes at startup)
 
 Will never work:
 

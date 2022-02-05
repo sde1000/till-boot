@@ -12,6 +12,13 @@ echo "Start of chroot-setup"
 source /root/chroot-config
 source /etc/os-release
 
+if [ "${ID}" = "ubuntu" ]; then
+    # Ubuntu leaves /etc/resolv.conf pointing at
+    # /run/systemd/resolve/stub-resolv.conf which does not exist
+    rm -f /etc/resolv.conf
+    ln -s /lib/systemd/resolv.conf /etc/
+fi
+
 # Don't ask any questions...
 debconf-set-selections <<EOF
 debconf	debconf/frontend	select	Noninteractive
@@ -136,12 +143,13 @@ if [ "${platform}" = "rpi" ]; then
     cp /root/scripts/initramfs-sntp.script /etc/initramfs-tools/scripts/init-bottom/sntp
 fi
 
-if [ "${platform}" = "rpi" ]; then
-    echo " --> configuring raspberry kernel for initrd"
+case ${platform} in
+    rpi)
+	echo " --> configuring raspberry kernel for initrd"
 
-    # The kernel is already installed, but we need to reconfigure
-    # the package to generate the initrds...
-    cat >/etc/default/raspberrypi-kernel <<EOF
+	# The kernel is already installed, but we need to reconfigure
+	# the package to generate the initrds...
+	cat >/etc/default/raspberrypi-kernel <<EOF
 # Defaults for raspberrypi-kernel
 
 # Uncomment the following line to enable generation of
@@ -155,11 +163,14 @@ INITRD=Yes
 #RPI_INITRD=Yes
 
 EOF
-    dpkg-reconfigure raspberrypi-kernel
-else
-    echo " --> updating initramfs"
-    update-initramfs -u
-fi
+	dpkg-reconfigure raspberrypi-kernel
+	;;
+    pc)
+	echo " --> updating initramfs"
+	update-initramfs -k all -d
+	update-initramfs -k all -c
+	;;
+esac
 
 echo " --> cleaning up package caches"
 # Clean up package caches

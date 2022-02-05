@@ -4,9 +4,9 @@
 
 set -e
 
+#pc_distro=focal
 #pc_distro=buster
 pc_distro=bullseye
-#pc_distro=focal
 rpi_distro=bullseye
 
 parallel --progress --bar <<EOF

@@ -261,7 +261,7 @@ setup_post_chroot
 
 # Distribution-specific post-chroot functions
 case ${upstream} in
-    debian|raspbian)
+    debian|raspbian|ubuntu)
 	# Add a systemd-networkd config file
 	cat >$target/etc/systemd/network/till.network <<EOF
 [Match]
@@ -296,7 +296,7 @@ sed "s/^hosts:.*$/hosts: mdns4_minimal \\[NOTFOUND=return] dns files/" <$target/
 mv $target/etc/nsswitch.conf.new $target/etc/nsswitch.conf
 
 # Zap the machine ID so it's regenerated on each reboot
-rm $target/var/lib/dbus/machine-id
+rm -f $target/var/lib/dbus/machine-id $target/etc/machine-id
 
 # Tell build-deb where to put the squashfs
 echo ${boot} >${target}.boot
