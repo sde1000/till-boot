@@ -64,8 +64,6 @@ console-setup
 sntp
 initramfs-tools
 busybox
-plymouth
-plymouth-themes
 EOF
 		       )
 
