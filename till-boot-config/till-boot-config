@@ -101,8 +101,8 @@ class pc(_platform):
             kfile = f"vmlinuz-pc-{self.architecture}"
             ifile = f"initrd-pc-{self.architecture}.img"
         else:
-            kfile = "vmlinuz-pc-{self.architecture}-{self.version}"
-            ifile = "initrd-pc-{self.architecture}-{self.version}.img"
+            kfile = f"vmlinuz-pc-{self.architecture}-{self.version}"
+            ifile = f"initrd-pc-{self.architecture}-{self.version}.img"
 
         # Copy the kernel and initrd into place if this has not
         # already been done

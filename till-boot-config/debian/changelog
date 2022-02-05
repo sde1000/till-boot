@@ -1,3 +1,9 @@
+till-boot-config (8) stable; urgency=medium
+
+  * Fix pc kernel filename when not using latest version
+
+ -- Stephen Early <steve@assorted.org.uk>  Sat, 5 Feb 2022 11:03:34 +0000
+
 till-boot-config (7) stable; urgency=medium
 
   * Include initrd= on pc kernel command line: necessary for EFI
