@@ -20,7 +20,7 @@ usrshare=${target}${usrshare_pkg}
 
 rm -rf $target
 mkdir -m 755 -p $usrshare
-wget https://boot.ipxe.org/ipxe.efi -O $usrshare/ipxe.efi
+wget https://boot.ipxe.org/snponly.efi -O $usrshare/ipxe.efi
 wget https://boot.ipxe.org/ipxe.pxe -O $usrshare/ipxe.pxe
 wget https://github.com/raspberrypi/firmware/raw/master/boot/bootcode.bin -O $usrshare/bootcode.bin
 
