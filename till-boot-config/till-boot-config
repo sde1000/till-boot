@@ -177,6 +177,12 @@ class rpi(_platform):
             if initrd:
                 self.initrds[kernel_name] = initrd
 
+    def get_append(self, settings):
+        append = super().get_append(settings)
+        if 'ntp-server' in settings:
+            append.append(f"ntp-server={settings['ntp-server']}")
+        return append
+
     def boot_files_ok(self):
         for f in self.required_boot_files:
             path = self.bpath / f

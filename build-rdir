@@ -21,7 +21,6 @@ fi
 extrainstall_norecommends=$(cat <<EOF
 postgresql-client
 openssh-client
-ntp
 acpid
 python3-psycopg2
 python3-reportlab
@@ -63,6 +62,10 @@ x11-xserver-utils
 python3-pil
 console-setup
 sntp
+initramfs-tools
+busybox
+plymouth
+plymouth-themes
 EOF
 		       )
 
@@ -157,7 +160,7 @@ case ${upstream} in
     ubuntu)
 	source=http://gb.archive.ubuntu.com/ubuntu/
 	debootstrap_keyring=
-	boot=casper
+	boot=live
 	function setup_apt_sources {
 	    cat >$target/etc/apt/sources.list <<EOF
 deb http://gb.archive.ubuntu.com/ubuntu $distribution main restricted universe multiverse
@@ -255,24 +258,19 @@ EOF
 # Invoke the setup script in the target
 setup_apt_sources
 setup_pre_chroot
-rm -f $target/etc/resolv.conf
 systemd-nspawn -D $target/ -a /root/scripts/chroot-setup
 setup_post_chroot
 
 # Distribution-specific post-chroot functions
-case ${distribution} in
+case ${upstream} in
     debian|raspbian)
 	# Add a systemd-networkd config file
 	cat >$target/etc/systemd/network/till.network <<EOF
 [Match]
-Name=eth0
-Virtualization=false
+Type=ether
 
 [Network]
-DHCP=true
-
-[DHCP]
-UseDNS=true
+DHCP=yes
 EOF
 	# Prevent sudo from looking up the fqdn every time and failing
 	cat >$target/etc/sudoers.d/nolookup <<EOF
@@ -293,9 +291,6 @@ EOF
 
 # Don't use our local proxy (if any) to fetch packages any more
 rm -f $target/etc/apt/apt.conf.d/40proxy
-
-# Zap /etc/resolv.conf - a new one will be generated on boot
-rm -f $target/etc/resolv.conf
 
 # The diskless terminal thinks it is called "till".  The real till is
 # probably also called "till".  Look at the DNS first to get the right answer!

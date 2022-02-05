@@ -1,3 +1,9 @@
+till-boot-config (9) stable; urgency=medium
+
+  * Add ntp-server to rpi platform kernel command line
+
+ -- Stephen Early <steve@assorted.org.uk>  Sat, 5 Feb 2022 19:50:08 +0000
+
 till-boot-config (8) stable; urgency=medium
 
   * Fix pc kernel filename when not using latest version

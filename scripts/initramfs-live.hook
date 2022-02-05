@@ -1,0 +1,26 @@
+#!/bin/sh
+PREREQ=""
+prereqs()
+{
+	echo "$PREREQ"
+}
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+. /usr/share/initramfs-tools/hook-functions
+# Begin real processing below this line
+
+# Filesystem: squashfs
+copy_exec /sbin/losetup
+manual_add_modules loop
+manual_add_modules squashfs
+manual_add_modules sqlzma
+manual_add_modules unlzma
+
+# Filesystem: overlay
+manual_add_modules overlay
+
+auto_add_modules net

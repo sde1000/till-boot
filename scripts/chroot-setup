@@ -43,22 +43,9 @@ apt-get -q -y install dbus
 echo " --> doing dist-upgrade"
 apt-get -q -y dist-upgrade
 
-case "${ID}" in
-    raspbian|debian)
-	echo " --> enabling systemd-networkd and systemd-resolved"
-	systemctl enable systemd-networkd
-	systemctl enable systemd-resolved
-	echo " --> installing live-boot"
-	apt-get -q -y install live-boot
-	;;
-    ubuntu)
-	echo " --> installing network-manager"
-	apt-get -q --no-install-recommends -y install network-manager
-
-	echo " --> installing casper"
-	apt-get -q --no-install-recommends -y install casper
-	;;
-esac
+echo " --> enabling systemd-networkd and systemd-resolved"
+systemctl enable systemd-networkd
+systemctl enable systemd-resolved
 
 echo " --> choosing UK keyboard"
 # Choose a UK keyboard...
@@ -73,21 +60,6 @@ echo " --> blacklisting display drivers"
 # Blacklist display drivers here - stay in text mode if we can!
 # vga16fb puts tills in modes that some LCD monitors can't auto-detect
 echo blacklist vga16fb >/etc/modprobe.d/blacklist-till.conf
-
-echo " --> setting up initramfs for network boot"
-# Setup initramfs for network boot
-cp /etc/initramfs-tools/initramfs.conf /root/
-sed -e 's/^MODULES=.*$/MODULES=netboot/' \
-    -e '$a\RESUME=none' \
-  </root/initramfs.conf >/etc/initramfs-tools/initramfs.conf
-rm /root/initramfs.conf
-echo blacklist vga16fb >>/etc/initramfs-tools/modules
-
-# Experimental: set managed=true in /etc/NetworkManager/NetworkManager.conf
-#cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf.old
-#sed s/managed=false/managed=true/ \
-#    </etc/NetworkManager/NetworkManager.conf.old \
-#    >/etc/NetworkManager/NetworkManager.conf
 
 
 echo " --> adding till user"
@@ -120,28 +92,6 @@ ExecStart=
 ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/local/bin/login-till --noclear %I \$TERM
 EOF
 
-case "${ID}" in
-    ubuntu)
-	echo " --> zapping unhelpful bits of casper"
-	# Zap bits of casper that are doing unhelpful things!
-	cat >/etc/casper.conf <<EOF
-USERNAME=
-USERFULLNAME=
-HOST=till
-BUILD_SYSTEM=Ubuntu
-EOF
-	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/02timezone
-	rm -f /usr/share/initramfs-tools/scripts/casper-bottom/10adduser
-	rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25adduser
-	# See https://bugs.launchpad.net/ubuntu/+source/casper/+bug/1755863 for
-	# the below...
-	rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25disable_cdrom.mount
-	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/15autologin
-	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/25configure_init
-	#rm -f /usr/share/initramfs-tools/scripts/casper-bottom/23networking
-	;;
-esac
-
 echo " --> installing extra requested packages without recommendations"
 apt-get -q -y --no-install-recommends install $(cat /root/extrainstall_norecommends)
 
@@ -165,8 +115,29 @@ if [ -f ${LIBCCID_CONFIG} ] ; then
     /root/scripts/update-libccid-config.py ${LIBCCID_CONFIG} ${LIBCCID_CONFIG}
 fi
 
+echo " --> setting up initramfs for network live boot"
+# This is after extrainstall_* because initramfs-tools will only have been
+# installed in that step on Raspberry
+cp /etc/initramfs-tools/initramfs.conf /root/
+sed -e 's/^MODULES=.*$/MODULES=netboot/' \
+    -e 's/^BUSYBOX=.*$/BUSYBOX=y/' \
+    -e '$a\RESUME=none' \
+  </root/initramfs.conf >/etc/initramfs-tools/initramfs.conf
+rm /root/initramfs.conf
+echo blacklist vga16fb >>/etc/initramfs-tools/modules
+cp /root/scripts/initramfs-live.hook /etc/initramfs-tools/hooks/live
+cp /root/scripts/initramfs-live.script /etc/initramfs-tools/scripts/live
+
 if [ "${platform}" = "rpi" ]; then
-    echo " --> configuring kernel"
+    echo " --> setting up initramfs for sntp"
+    # Raspberries don't have a non-volatile clock, so we support
+    # setting the time with sntp in the initramfs just before we pivot
+    # to the overlayfs root and start systemd
+    cp /root/scripts/initramfs-sntp.script /etc/initramfs-tools/scripts/init-bottom/sntp
+fi
+
+if [ "${platform}" = "rpi" ]; then
+    echo " --> configuring raspberry kernel for initrd"
 
     # The kernel is already installed, but we need to reconfigure
     # the package to generate the initrds...
@@ -185,6 +156,9 @@ INITRD=Yes
 
 EOF
     dpkg-reconfigure raspberrypi-kernel
+else
+    echo " --> updating initramfs"
+    update-initramfs -u
 fi
 
 echo " --> cleaning up package caches"

@@ -1,0 +1,85 @@
+# -*- shell-script -*-
+# live boot: this is sourced in the initramfs by /init if boot=live is specified
+
+# NB /scripts/local and /scripts/nfs are sourced immediately before this
+
+# The general shape of this script is taken from the Debian live-boot
+# package, but all of the flexibility has been cut out because it is
+# not needed here.
+
+# The way the nfs, squashfs and overlay mounts are set up differs from
+# live-boot. live-boot mounts these under /run, which is then moved
+# into the mounted overlayfs setting up a circular dependency that
+# causes problems with systemd at shutdown time. This script keeps all
+# these mountpoints in the initramfs and only exposes the overlayfs to
+# the running system.
+
+# This script requires the initramfs to be built with busybox instead of klibc
+
+live_top()
+{
+    if [ "${live_top_used}" != "yes" ]; then
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/live-top"
+	run_scripts /scripts/live-top
+	[ "$quiet" != "y" ] && log_end_msg
+    fi
+    live_top_used=yes
+}
+
+live_premount()
+{
+    if [ "${live_premount_used}" != "yes" ]; then
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/live-premount"
+	run_scripts /scripts/live-premount
+	[ "$quiet" != "y" ] && log_end_msg
+    fi
+    live_premount_used=yes
+}
+
+live_bottom()
+{
+    if [ "${live_premount_used}" = "yes" ] || [ "${live_top_used}" = "yes" ]; then
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/live-bottom"
+	run_scripts /scripts/live-bottom
+	[ "$quiet" != "y" ] && log_end_msg
+    fi
+    live_premount_used=no
+    live_top_used=no
+}
+
+
+mountroot()
+{
+    # This is called by /init
+    # We make use of nfs_mount_root already sourced from /scripts/nfs
+    mkdir /nfsroot
+    rootmnt=/nfsroot nfs_mount_root
+    mkdir /squashfs
+    mount -t squashfs -o ro,loop /nfsroot/live/till.squashfs /squashfs
+    mkdir /cowfs
+    mount -t tmpfs -o "rw,noatime,mode=755,size=50%" tmpfs /cowfs
+    mkdir /cowfs/rw
+    mkdir /cowfs/work
+    mount -t overlay -o noatime,lowerdir=/squashfs,upperdir=/cowfs/rw,workdir=/cowfs/work overlay ${rootmnt}
+    # The fstab in the squashfs is the "unconfigured" one from debootstrap;
+    # replace it entirely.
+    echo "overlay / overlay rw 0 0" >${rootmnt}/etc/fstab
+}
+
+mount_top()
+{
+    # Note, also called directly in case it's overridden.
+    live_top
+}
+
+mount_premount()
+{
+    # Note, also called directly in case it's overridden.
+    live_premount
+}
+
+mount_bottom()
+{
+    # Note, also called directly in case it's overridden.
+    live_bottom
+}

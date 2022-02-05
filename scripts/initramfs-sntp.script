@@ -1,0 +1,27 @@
+#!/bin/sh
+PREREQ=""
+prereqs()
+{
+        echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+        prereqs
+        exit 0
+        ;;
+esac
+
+NTPSERVER=
+
+for x in $(cat /proc/cmdline); do
+    case $x in
+	ntp-server=*)
+	    NTPSERVER="${x#ntp-server=}"
+	    ;;
+    esac
+done
+
+if [ -n "${NTPSERVER}" ]; then
+    chroot /root /usr/bin/sntp -Ss -M 128 ${NTPSERVER}
+fi
