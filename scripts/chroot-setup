@@ -9,6 +9,7 @@ test -e /root/scripts/chroot-setup || exit 1
 
 echo "Start of chroot-setup"
 
+source /root/chroot-config
 source /etc/os-release
 
 # Don't ask any questions...
@@ -120,10 +121,6 @@ ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/loca
 EOF
 
 case "${ID}" in
-    raspbian|debian)
-	echo " --> setting up live-boot and live-config"
-	echo "     (nothing to do)"
-	;;
     ubuntu)
 	echo " --> zapping unhelpful bits of casper"
 	# Zap bits of casper that are doing unhelpful things!
@@ -168,13 +165,12 @@ if [ -f ${LIBCCID_CONFIG} ] ; then
     /root/scripts/update-libccid-config.py ${LIBCCID_CONFIG} ${LIBCCID_CONFIG}
 fi
 
-echo " --> installing kernel"
-case "${ID}" in
-    raspbian)
-	apt-get -q -y install raspberrypi-kernel raspberrypi-bootloader
-	# The kernel is probably already installed, but we need to reconfigure
-	# the package to generate the initrds...
-	cat >/etc/default/raspberrypi-kernel <<EOF
+if [ "${platform}" = "rpi" ]; then
+    echo " --> configuring kernel"
+
+    # The kernel is already installed, but we need to reconfigure
+    # the package to generate the initrds...
+    cat >/etc/default/raspberrypi-kernel <<EOF
 # Defaults for raspberrypi-kernel
 
 # Uncomment the following line to enable generation of
@@ -188,25 +184,8 @@ INITRD=Yes
 #RPI_INITRD=Yes
 
 EOF
-	dpkg-reconfigure raspberrypi-kernel
-	;;
-    debian)
-	case $(dpkg --print-architecture) in
-	    amd64)
-		apt-get -q -y --no-install-recommends install linux-image-amd64
-		;;
-	    i386)
-		apt-get -q -y --no-install-recommends install linux-image-686
-		;;
-	    *)
-		echo "Don't know which kernel package to install for this arch"
-		;;
-	esac
-	;;
-    ubuntu)
-	apt-get -q -y --no-install-recommends install linux-generic-hwe-18.04
-	;;
-esac
+    dpkg-reconfigure raspberrypi-kernel
+fi
 
 echo " --> cleaning up package caches"
 # Clean up package caches

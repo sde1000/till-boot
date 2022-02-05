@@ -5,17 +5,21 @@
 set -e
 
 #pc_distro=buster
-pc_distro=bionic
+pc_distro=bullseye
+#pc_distro=focal
+rpi_distro=bullseye
 
 parallel --progress --bar <<EOF
 ./build-rdir pc $pc_distro amd64 rdir-pc-amd64 >rdir-pc-amd64-buildlog 2>&1
 ./build-rdir pc $pc_distro i386 rdir-pc-i386 >rdir-pc-i386-buildlog 2>&1
-./build-rdir rpi buster armhf rdir-rpi-armhf >rdir-rpi-armhf-buildlog 2>&1
+./build-rdir rpi $rpi_distro armhf rdir-rpi-armhf >rdir-rpi-armhf-buildlog 2>&1
+./build-rdir rpi $rpi_distro arm64 rdir-rpi-arm64 >rdir-rpi-arm64-buildlog 2>&1
 EOF
 
 version=$(date +%Y%m%d%H%M%S)
 ./build-deb pc amd64 rdir-pc-amd64 ${version}
 ./build-deb pc i386 rdir-pc-i386 ${version}
 ./build-deb rpi armhf rdir-rpi-armhf ${version}
+./build-deb rpi arm64 rdir-rpi-arm64 ${version}
 
 ./build-loaders-deb ${version}
