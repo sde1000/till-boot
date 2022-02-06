@@ -3,10 +3,27 @@ Build debian packages for network booting of tills
 These packages are installed on a server (usually, but not
 necessarily, the main till).
 
-You must be (real) root when running the build scripts.
+You must be (real) root when running the image build scripts.
 
 Required packages:
-debootstrap squashfs-tools systemd-container qemu-user-static binfmt-support wget parallel
+debootstrap squashfs-tools systemd-container qemu-user-static binfmt-support wget parallel debhelper
+
+To build the boot image and loaders package:
+
+# ./build-all
+
+To build the till-boot-config package:
+
+$ cd till-boot-config
+$ dpkg-buildpackage -us -uc
+
+
+You can build the boot image packages on a machine of any architecture
+(eg. amd64 on arm64 or armhf on i386), but building will be fastest
+when a boot image is built on a machine with compatible
+architecture. If you have access to both a PC and a Raspberry you may
+want to split the work between the two for speed. Edit the build-all
+script appropriately.
 
 
 Terms used:
