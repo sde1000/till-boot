@@ -1,6 +1,5 @@
 debian/.debhelper
 debian/files
-debian/source
 debian/till-boot-config.debhelper.log
 debian/till-boot-config.substvars
 debian/till-boot-config
