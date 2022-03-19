@@ -3,8 +3,7 @@
 # This script invokes the till software and deals with any exit code.
 # It lives in /home/till/
 
-matchbox-window-manager -use_titlebar no -use_cursor $(cat pointer) &
-xset s off
+matchbox-window-manager -use_titlebar no &
 source runtill-command
 tillexit=$?
 case "$tillexit" in

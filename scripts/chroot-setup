@@ -81,8 +81,8 @@ passwd -d root
 echo " --> copying setup script to /usr/local/sbin/"
 install -m 755 /root/scripts/tillsetup.py /usr/local/sbin/tillsetup
 
-echo " --> adding run-till script to till user's home directory"
-install -m 755 -o till -g till /root/scripts/runtill /home/till/runtill
+echo " --> adding mode scripts to till user's home directory"
+install -m 755 -o till -g till /root/scripts/mode-*[^~] /home/till/
 
 echo " --> adding set-printserver script to till user's home directory"
 install -m 755 -o till -g till /root/scripts/set-printserver.sh /home/till/set-printserver.sh

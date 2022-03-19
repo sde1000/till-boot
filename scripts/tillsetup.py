@@ -97,27 +97,20 @@ def run():
         time.sleep(60)
         bail("did not reboot in time!")
 
-    ntp = "ntp-server"
-    if config.get(ntp):
-        with open(ntp, "w") as f:
-            f.write(config[ntp])
-            f.write("\n")
-    else:
-        try:
-            os.unlink(ntp)
-        except FileNotFoundError:
-            pass
+    mode = config.get("mode", "till")
 
     mm = "maintenance-message"
     if config.get(mm):
+        mode = "maintenance"
         with open(mm, "w") as f:
             f.write(config[mm])
             f.write("\n")
-    else:
-        try:
-            os.unlink(mm)
-        except FileNotFoundError:
-            pass
+
+    with open("mode", "w") as f:
+        f.write(f"{mode}\n")
+
+    with open("display-url", "w") as f:
+        f.write(f"{config.get('display-url', 'https://quicktill.assorted.org.uk')}\n")
 
     # Add apt respositories
     with open("apt-sources.list", "w") as f:
