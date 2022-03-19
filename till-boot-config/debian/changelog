@@ -1,3 +1,9 @@
+till-boot-config (10) stable; urgency=medium
+
+  * Warn if ntp-server setting is missing on rpi platform
+
+ -- Stephen Early <steve@assorted.org.uk>  Sat, 19 Mar 2022 20:12:04 +0000
+
 till-boot-config (9) stable; urgency=medium
 
   * Add ntp-server to rpi platform kernel command line

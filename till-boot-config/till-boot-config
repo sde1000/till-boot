@@ -200,6 +200,10 @@ class rpi(_platform):
     def install(self, tftp_dir, http_dir, settings, latest, default_append):
         till = settings['name']
 
+        if 'ntp-server' not in settings:
+            log.warning("%s: ntp-server not specified, time will "
+                        "not be set in initrd", till)
+
         serial = settings['serial']
         serial_dir = tftp_dir / serial
 
