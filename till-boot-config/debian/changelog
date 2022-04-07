@@ -1,3 +1,9 @@
+till-boot-config (11) stable; urgency=medium
+
+  * Ensure 'version' in yaml files generated for each till is a string
+
+ -- Stephen Early <steve@assorted.org.uk>  Thu, 7 Apr 2022 10:40:59 +0100
+
 till-boot-config (10) stable; urgency=medium
 
   * Warn if ntp-server setting is missing on rpi platform
