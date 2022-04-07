@@ -4,8 +4,6 @@
 
 set -e
 
-#pc_distro=focal
-#pc_distro=buster
 pc_distro=bullseye
 rpi_distro=bullseye
 

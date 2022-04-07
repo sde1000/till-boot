@@ -68,8 +68,7 @@ fonts-ubuntu
 fonts-symbola
 fonts-liberation
 xterm
-matchbox-window-manager
-enlightenment
+mutter
 x11-xserver-utils
 python3-pil
 console-setup
