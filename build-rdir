@@ -73,6 +73,7 @@ x11-xserver-utils
 python3-pil
 console-setup
 sntp
+systemd-timesyncd
 initramfs-tools
 busybox
 ${chromium_packages}
