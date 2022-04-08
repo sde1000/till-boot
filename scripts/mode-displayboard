@@ -3,7 +3,7 @@
 # This script invokes a web browser, full-screen
 # It lives in /home/till/
 
-matchbox-window-manager -use_titlebar no -use_cursor no &
+mutter &
 xset s off
 xset -dpms
 xset s noblank
