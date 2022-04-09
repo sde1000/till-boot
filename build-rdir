@@ -276,12 +276,22 @@ setup_post_chroot
 case ${upstream} in
     debian|raspbian|ubuntu)
 	# Add a systemd-networkd config file
+	# CriticalConnection=yes is _not_ a DHCP-only setting;
+	# the systemd docs are out of date
+	# See https://github.com/systemd/systemd/issues/11650
+	# It is necessary to prevent systemd-networkd deconfiguring
+	# the network interface during shutdown, which can lead to
+	# a hang when it can't load the "reboot" code over NFS...
 	cat >$target/etc/systemd/network/till.network <<EOF
 [Match]
 Type=ether
 
 [Network]
 DHCP=yes
+IgnoreCarrierLoss=yes
+
+[DHCP]
+CriticalConnection=yes
 EOF
 	# Prevent sudo from looking up the fqdn every time and failing
 	cat >$target/etc/sudoers.d/nolookup <<EOF
