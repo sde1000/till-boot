@@ -1,4 +1,7 @@
-Build debian packages for network booting of tills
+# Network booting of tills
+
+This repository contains scripts used to generate Debian packages for
+network booting of tills and information screens.
 
 These packages are installed on a server (usually, but not
 necessarily, the main till).
@@ -6,17 +9,23 @@ necessarily, the main till).
 You must be (real) root when running the image build scripts.
 
 Required packages:
+
+```
 debootstrap squashfs-tools systemd-container qemu-user-static binfmt-support wget parallel debhelper
+```
 
-To build the boot image and loaders package:
+To build the boot image and loaders package, as root:
 
-# ./build-all
+```
+./build-all
+```
 
 To build the till-boot-config package:
 
-$ cd till-boot-config
-$ dpkg-buildpackage -us -uc
-
+```
+cd till-boot-config
+dpkg-buildpackage -us -uc
+```
 
 You can build the boot image packages on a machine of any architecture
 (eg. amd64 on arm64 or armhf on i386), but building will be fastest
@@ -26,7 +35,7 @@ want to split the work between the two for speed. Edit the build-all
 script appropriately.
 
 
-Terms used:
+## Terms used
 
 "platform": the type of computer to be booted.  Platforms vary in
 their requirements for boot files and their placement: for example,
@@ -44,18 +53,18 @@ eg. 'xenial', 'bionic', 'focal' for Ubuntu, 'buster' or 'bullseye' for
 debian or raspberry pi os
 
 
-Currently working:
+## Currently working
 
-pc focal amd64
-pc buster {i386,amd64}
-pc bullseye {i386,amd64}
-rpi buster armhf
-rpi bullseye {armhf,arm64}
+* pc focal amd64
+* pc buster {i386,amd64}
+* pc bullseye {i386,amd64}
+* rpi buster armhf
+* rpi bullseye {armhf,arm64}
 
-Currently not working:
+## Currently not working
 
-pc bionic {i386,amd64} (freezes at startup)
+* pc bionic {i386,amd64} (freezes at startup)
 
-Will never work:
+## Will never work
 
-pc focal i386 (focal drops i386 support)
+* pc focal i386 (focal drops i386 support)
