@@ -68,3 +68,51 @@ debian or raspberry pi os
 ## Will never work
 
 * pc focal i386 (focal drops i386 support)
+
+
+# How platforms boot
+
+## PC
+
+For "legacy" boot: The PXE bootloader in ROM obtains an IP address,
+TFTP server address and the boot filename "ipxe.pxe" from the DHCP
+server, and loads `ipxe.pxe` via TFTP. (If the PXE bootloader in ROM
+_is_ [iPXE](https://ipxe.org/), this step is skipped.)
+
+For UEFI boot: The PXE bootloader in ROM obtains an IP address, TFTP
+server address and the boot filename "ipxe.efi" from the DHCP server,
+and loads `ipxe.efi` via TFTP.
+
+[iPXE](https://ipxe.org/) performs DHCP again, but this time is given
+a HTTP URL as the boot filename, pointing to the `.ipxe` configuration
+file specific to the till being booted.
+
+iPXE loads the `{hostname}.ipxe` file via HTTP. This file instructs it
+to fetch the kernel and initrd via HTTP, and then start the kernel. If
+iPXE doesn't have Linux support built-in (for example if it's a small
+build of it in ROM on a legacy boot system) it chainloads the
+fully-featured `ipxe.pxe` instead and starts again.
+
+The kernel runs the initrd, which performs DHCP to obtain an IP
+address, and NFS mounts the till boot image from the location
+specified on the kernel command line in the `{hostname}.ipxe`
+file. The squashfs image is loopback mounted, and an overlayfs is
+created to enable ramdisk-backed write to the image. The image is then
+started with the overlayfs as the root filesystem.
+
+## Raspberry Pi
+
+The boot ROM in the Pi performs DHCP to obtain an IP address and TFTP
+server address. On Pis prior to Pi 4, it loads "bootcode.bin" via TFTP
+and then starts again.
+
+The Pi loads a number of files from "{serialnumber}/" via TFTP:
+`config.txt`, `start.elf` or `start4.elf`, etc. and ultimately loads a
+kernel, initrd, and `cmdline.txt`.
+
+The kernel runs the initrd, which performs DHCP to obtain an IP
+address, and NFS mounts the till boot image from the location
+specified on the kernel command line in the `cmdline.txt` file. The
+squashfs image is loopback mounted, and an overlayfs is created to
+enable ramdisk-backed write to the image. The image is then started
+with the overlayfs as the root filesystem.
