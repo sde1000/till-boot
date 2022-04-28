@@ -23,6 +23,7 @@ if [ "$(tty)" = "/dev/tty1" ]; then
   if test -f install; then
     sudo apt-get -y install $(cat install)
   fi
+  (umask 077 ; touch .Xauthority)
   if [ "$(cat pointer)" = "no" ]; then
     exec startx ./mode-$(cat mode) -- -nocursor
   else
