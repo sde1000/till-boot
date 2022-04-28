@@ -23,7 +23,7 @@ sudo apt-get install aptly
 Import the signing key for the main repository:
 
 ```
-gpg --no-default-keyring --keyring trustedkeys.gpg --import <<EOF
+gpg1 --no-default-keyring --keyring trustedkeys.gpg --import <<EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQGNBF+1RAABDADf1ShTPOBMZCocpniMNTgBkEoktMrQTp6m6cTx+jyfl8Tt7/k3
