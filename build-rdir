@@ -195,6 +195,14 @@ deb-src http://security.debian.org/debian-security $distribution/updates main co
 
 deb http://deb.debian.org/debian/ $distribution-updates main contrib non-free
 deb-src http://deb.debian.org/debian/ $distribution-updates main contrib non-free
+
+deb http://deb.debian.org/debian/ $distribution-backports main contrib non-free
+deb-src http://deb.debian.org/debian/ $distribution-backports main contrib non-free
+EOF
+	    cat >$target/etc/apt/preferences <<EOF
+Package: linux-image-*
+Pin: release a=$distribution-backports
+Pin-Priority: 900
 EOF
 	}
 	;;
