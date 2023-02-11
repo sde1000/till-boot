@@ -4,13 +4,14 @@
 # It lives in /home/till/
 
 mutter &
-source runtill-command
+source runtill-command >runtill.log 2>&1
 tillexit=$?
 case "$tillexit" in
   0) exit ;;
   20) sudo poweroff ;;
   30) sudo reboot ;;
   40) exit ;;
+  *) zenity --width=5000 --height=5000 --title="Till errors" --text-info --filename runtill.log ;;
 esac
 sleep 1
 exit
