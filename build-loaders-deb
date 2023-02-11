@@ -38,4 +38,7 @@ Priority: optional
 Description: Bootloaders for quicktill netboot
 EOF
 
-dpkg-deb -b $target .
+# The default compression has changed from xz to zstd, which isn't
+# supported by reprepro or aptly on Ubuntu-20.04. Continue to use xz
+# for now.
+dpkg-deb -Zxz -b $target .
