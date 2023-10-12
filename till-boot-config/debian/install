@@ -1,2 +1,2 @@
 till-boot-config usr/sbin
-example-config.yaml usr/share/doc/till-boot-config
+example-config.toml usr/share/doc/till-boot-config

@@ -1,6 +1,4 @@
-%YAML 1.1
----
-# This file should usually be called /etc/till-boot/config
+# This file should usually be called /etc/till-boot/config.toml
 
 # For PC booting, there must be a DHCP server set up with the
 # following in its configuration file:
@@ -57,110 +55,120 @@
 # [till-name].yaml
 
 # Location served by tftpd: we write to this directory
-tftp-dir: /var/lib/tftpboot
+tftp-dir = "/var/lib/tftpboot"
 
 # Location served over nfs: we read from this directory
 # We expect subdirectories to be named platform/arch/version and to
 # contain an image-info.yaml file
 # Versions are treated as integers; higher numbers are more recent
-nfs-dir: /usr/share/till-boot
+nfs-dir = "/usr/share/till-boot"
 
 # Bootloaders: all files here are copied to tftp-dir
-loaders-dir: /usr/share/till-boot/loaders
+loaders-dir = "/usr/share/till-boot/loaders"
 
 # Location of kernels and initrds extracted from squashfs.  We read
 # from this directory.  We expect subdirectories to be named
 # platform/arch/version and to correspond to those in nfs-dir
-boot-dir: /var/lib/till-boot
+boot-dir = "/var/lib/till-boot"
 
 # Location served over http: we write to this directory
 # Permitted to be the same as tftp-dir
-http-dir: /var/lib/tftpboot
+http-dir = "/var/lib/tftpboot"
 
 # Address of TFTP server serving tftp-dir
-tftp-server: 192.168.73.30 # IP address
+tftp-server = "192.168.73.30"  # IP address
 
 # Address of NFS server serving nfs-dir
-nfs-server: 192.168.73.30 # IP address
+nfs-server= "192.168.73.30"  # IP address
 
 # URL of http server serving http-dir
-http-server: http://192.168.73.30/till-boot/
+http-server = "http://192.168.73.30/till-boot/"
 
-defaults:
-  platform: pc
-  version: latest
-  configurl: http://192.168.73.30/emfcamp.py
-  configname: default
-  dbname: emfcamp
-  dbhost: 192.168.73.30
-  dbuser: steve
-  install:
-   - quicktill19
-  fontsize: 12
-  pointer: yes
-  repos:
-   - "deb [trusted=yes] http://192.168.73.30/software tills main"
+[defaults]
+platform = "pc"
+version = "latest"
+configurl = "http://192.168.73.30/emfcamp.py"
+configname = "default"
+dbname = "emfcamp"
+dbhost = "192.168.73.30"
+dbuser = "steve"
+install = [
+  "quicktill22",
+]
+fontsize = "12"
+pointer = true
+repos = [
+   "deb [trusted=yes] http://192.168.73.30/software tills main",
+]
 
-defaults-pc:
-  architecture: amd64
+[defaults-pc]
+architecture = "amd64"
 
-defaults-rpi:
-  architecture: arm64
-  #config-pi4:
-  # - pi4-only option for config.txt
-  #config:
-  # - general option for config.txt
+[defaults-rpi]
+architecture = "arm64"
+config-pi4 = [
+  # "pi4-only option for config.txt",
+]
+config = [
+  # "general option for config.txt",
+]
+
 
 # The tills and their individual options are listed below.
-tills:
-  test-till-vm:
-    #architecture: i386
-    configname: mainbar
-    keyboard: yes
+[tills]
 
-  test-till-vm-efi:
-    architecture: amd64
-    configname: mainbar
+[tills.test-till-vm]
+#architecture = "i386"
+configname = "mainbar"
+keyboard = true
 
-  test-netboot-till:
-    configname: mainbar
-    architecture: i386
-    append:
-     - video=LVDS-1:d
-    extra-install:
-     - till-boot-disable-lvds
+[tills.test-till-vm-efi]
+architecture = "amd64"
+configname = "mainbar"
 
-  drone:
-    configname: default
-    architecture: amd64
-    fontsize: 16
-    pointer: no
+[tills.test-netboot-till]
+configname = "mainbar"
+architecture = "i386"
+append = [
+  "video=LVDS-1:d",
+]
+extra-install = [
+  "till-boot-disable-lvds",
+]
 
-  test-till:
-    configname: stockterminal
+[tills.drone]
+configname = "default"
+architecture = "amd64"
+fontsize = "16"
+pointer = false
 
-  pi1:
-    platform: rpi
-    serial: a6d7c064
-    mac: b8:27:eb:d7:c0:64
-    config:
-      - start_debug=1
-      - dtoverlay=disable-bt
-      - uart_2ndstage=1
+[tills.test-till]
+configname = "stockterminal"
 
-  pi3:
-    platform: rpi
-    serial: 70730e89
-    mac: b8:27:eb:73:0e:89
-    keyboard: yes
-    # Use this firmware, not the firmware from the image
-    #override-firmware: /home/steve/large/firmware/boot
-    config:
-      #- start_debug=1
-      - dtoverlay=disable-bt
-      - uart_2ndstage=1
+[tills.pi1]
+platform = "rpi"
+serial = "a6d7c064"
+mac = "b8:27:eb:d7:c0:64"
+config = [
+  "start_debug=1",
+  "dtoverlay=disable-bt",
+  "uart_2ndstage=1",
+]
 
-  pi4:
-    platform: rpi
-    serial: 7c622f07
-    keyboard: yes
+[tills.pi3]
+platform = "rpi"
+serial = "70730e89"
+mac = "b8:27:eb:73:0e:89"
+keyboard = true
+# Use this firmware, not the firmware from the image
+#override-firmware = "/home/steve/large/firmware/boot"
+config = [
+  #"start_debug=1",
+  "dtoverlay=disable-bt",
+  "uart_2ndstage=1",
+]
+
+[tills.pi4]
+platform = "rpi"
+serial = "7c622f07"
+keyboard = "yes"

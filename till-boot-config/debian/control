@@ -7,6 +7,6 @@ Standards-Version: 3.9.8
 
 Package: till-boot-config
 Architecture: all
-Depends: python3 (>=3.6), till-boot-loaders, python3-yaml, tftpd-hpa, nfs-kernel-server, ${misc:Depends}
+Depends: python3 (>=3.6), till-boot-loaders, python3-yaml, python3-tomli, tftpd-hpa, nfs-kernel-server, ${misc:Depends}
 Description: Configuration script for network booted tills
  Script that builds tftpboot config for network booted tills

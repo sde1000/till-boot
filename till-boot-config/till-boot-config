@@ -4,13 +4,19 @@ import sys
 import os
 import argparse
 import yaml
+import json
 from pathlib import Path
 import os.path
 import shutil
-import socket
 import logging
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 log = logging.getLogger("till-boot-config")
+
 
 def path_or_fail(config, cmdline, name):
     path = cmdline or config.get(name, None)
@@ -19,11 +25,14 @@ def path_or_fail(config, cmdline, name):
         sys.exit(1)
     return Path(path)
 
+
 def path_or_none(path):
     return Path(path) if path else None
 
+
 class _platform:
     required_settings = [
+        "name",  # inserted automatically
         "configurl",
         "configname",
         "dbname",
@@ -51,6 +60,7 @@ class _platform:
             f"nfsroot={self.nfs_server}:{self.mount_path}",
             f"till-boot-version={self.version}",
             f"till-boot-config={self.http_server}{settings['name']}.yaml",
+            f"till-boot-config-json={self.http_server}{settings['name']}.json",
         ]
         return append
 
@@ -62,11 +72,10 @@ class _platform:
     def __str__(self):
         return f"{self.description}: {self.architecture} {self.version}"
 
-class pc(_platform):
-    """PC image
 
-    """
+class pc(_platform):
     description = "PC"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.kernel = None
@@ -130,6 +139,7 @@ class pc(_platform):
             f.write(f"initrd {ifile}\n")
             f.write("boot\n")
 
+
 class rpi(_platform):
     description = "Raspberry PI"
     required_boot_files = [
@@ -162,7 +172,7 @@ class rpi(_platform):
         self.bpath = self.boot_path / "boot"
         possible_initrds = list(self.bpath.glob("initrd.img-*"))
         prefix = os.path.commonprefix([x.name for x in possible_initrds])
-        self.initrds = {} # kernel name -> initrd path
+        self.initrds = {}  # kernel name -> initrd path
         for kernel_name, suffix in self.initrd_suffixes.items():
             kernel = self.bpath / kernel_name
             if not kernel.is_file():
@@ -236,10 +246,12 @@ class rpi(_platform):
             if self.architecture == 'armhf':
                 for model, kernel in self.armhf_kernels.items():
                     f.write(f"[{model}]\n")
-                    f.write(f"initramfs {self.initrds[kernel].name} followkernel\n\n")
+                    f.write(f"initramfs {self.initrds[kernel].name} "
+                            f"followkernel\n\n")
             if self.architecture == 'arm64':
                 f.write("arm_64bit=1\n")
-                f.write(f"initramfs {self.initrds['kernel8.img'].name} followkernel\n\n")
+                f.write(f"initramfs {self.initrds['kernel8.img'].name} "
+                        f"followkernel\n\n")
             for model in self.armhf_kernels.keys():
                 mcfg = self.info.get(f"config-{model}", []) \
                     + settings.get(f"config-{model}", [])
@@ -249,24 +261,21 @@ class rpi(_platform):
                         f.write(f"{ci}\n")
                     f.write("\n")
             f.write("[all]\n")
-            for ci in self.info.get("config", []) \
-                + settings.get("config", []):
+            for ci in self.info.get("config", []) + settings.get("config", []):
                 f.write(f"{ci}\n")
             f.write("\n# end\n\n")
+
 
 platforms = {
     'pc': pc,
     'rpi': rpi,
 }
 
-class till:
-    def __init__(self, config):
-        pass
 
 def run():
     parser = argparse.ArgumentParser("Set up networked boot for quicktill")
     parser.add_argument("--config-file", "-c", help="config file location",
-                        default="/etc/till-boot/config")
+                        default="/etc/till-boot/config.toml")
     parser.add_argument("--nfs-dir", help="override nfs root location")
     parser.add_argument("--tftp-dir", help="override tftp dir location")
     parser.add_argument("--boot-dir",
@@ -286,10 +295,19 @@ def run():
         loglevel = logging.WARNING
 
     logging.basicConfig(level=loglevel)
-    
+
     # Read the configuration
-    with open(args.config_file) as f:
-        config = yaml.safe_load(f)
+    config = None
+    cf = args.config_file
+    try:
+        with open(cf, "rb") as f:
+            config = tomllib.load(f)
+    except FileNotFoundError:
+        # Support legacy yaml config files for now
+        if cf.lower().endswith(".toml"):
+            cf = cf[:-5]
+            with open(cf) as f:
+                config = yaml.safe_load(f)
 
     nfs_dir = path_or_fail(config, args.nfs_dir, "nfs-dir")
     tftp_dir = path_or_fail(config, args.tftp_dir, "tftp-dir")
@@ -410,7 +428,6 @@ def run():
         if version > latest.get((platform, arch), ""):
             latest[(platform, arch)] = version
 
-    tills = {}
     # Process the configuration for each till
     for till, till_settings in config.get("tills", {}).items():
         log.info("Working on %s", till)
@@ -469,12 +486,17 @@ def run():
                     f"for {till}; do not edit\n")
             yaml.dump(settings, f)
 
+        jf = http_dir / f"{till}.json"
+        with jf.open('w') as f:
+            json.dump(settings, f, indent=2)
+
     # Make sure the loaders are copied into the tftp dir
-    for l in loaders:
-        dest = tftp_dir / l.name
+    for loader in loaders:
+        dest = tftp_dir / loader.name
         if dest.exists():
             dest.unlink()
-        shutil.copyfile(l, dest)
+        shutil.copyfile(loader, dest)
+
 
 if __name__ == "__main__":
     run()

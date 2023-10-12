@@ -1,7 +1,0 @@
-The Debian Package till-boot-config
------------------------------------
-
-Reads /etc/till-boot/config and /usr/share/till-boot and outputs
-netboot files to /var/lib/tftpboot by default.
-
- -- Stephen Early <steve@assorted.org.uk>  Sun, 08 Apr 2018 21:22:58 +0100

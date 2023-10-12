@@ -236,8 +236,9 @@ echo Building ${platform} ${distribution}-${arch} chroot in ${target}
 manifest=${target}-filesystem.manifest
 diskdefines=${target}-README.diskdefines
 imginfo=${target}-image-info.yaml
+imginfo_json=${target}-image-info.json
 
-rm -rf $target $manifest $diskdefines $imginfo
+rm -rf $target $manifest $diskdefines $imginfo $imginfo_json
 mkdir $target
 
 if [ $crossbuild ]; then
@@ -380,3 +381,6 @@ EOF
 EOF
     fi
 fi
+
+# Image info file, JSON version
+./yaml2json.py <${imginfo} >${imginfo_json}
