@@ -12,6 +12,12 @@ echo "Start of chroot-setup"
 source /root/chroot-config
 source /etc/os-release
 
+# Raspberry armhf requires arm64 packages to be supported as well for
+# the kernel used on PI4.
+if [ "${arch}" = "armhf" ]; then
+    dpkg --add-architecture arm64
+fi
+
 if [ "${ID}" = "ubuntu" ]; then
     # Ubuntu leaves /etc/resolv.conf pointing at
     # /run/systemd/resolve/stub-resolv.conf which does not exist
@@ -143,13 +149,15 @@ if [ "${platform}" = "rpi" ]; then
     cp /root/scripts/initramfs-sntp.script /etc/initramfs-tools/scripts/init-bottom/sntp
 fi
 
-case ${platform} in
-    rpi)
-	echo " --> configuring raspberry kernel for initrd"
+# Raspberry pre-bookworm has a non-standard procedure for regenerating
+# initrds
 
-	# The kernel is already installed, but we need to reconfigure
-	# the package to generate the initrds...
-	cat >/etc/default/raspberrypi-kernel <<EOF
+if [ "${platform}" = "rpi" -a "${VERSION_CODENAME}" != "bookworm" ]; then
+    echo " --> configuring raspberry kernel for initrd"
+
+    # The kernel is already installed, but we need to reconfigure
+    # the package to generate the initrds...
+    cat >/etc/default/raspberrypi-kernel <<EOF
 # Defaults for raspberrypi-kernel
 
 # Uncomment the following line to enable generation of
@@ -163,14 +171,12 @@ INITRD=Yes
 #RPI_INITRD=Yes
 
 EOF
-	dpkg-reconfigure raspberrypi-kernel
-	;;
-    pc)
-	echo " --> updating initramfs"
-	update-initramfs -k all -d
-	update-initramfs -k all -c
-	;;
-esac
+    dpkg-reconfigure raspberrypi-kernel
+else
+    echo " --> updating initramfs"
+    update-initramfs -k all -d
+    update-initramfs -k all -c
+fi
 
 echo " --> cleaning up package caches"
 # Clean up package caches
@@ -181,7 +187,7 @@ dpkg --clear-avail
 echo " --> setting up private repo list in till home directory"
 rm -f /etc/apt/sources.list.d/till-boot.list
 echo -n >/home/till/apt-sources.list
-chown till.till /home/till/apt-sources.list
+chown till:till /home/till/apt-sources.list
 ln -s /home/till/apt-sources.list /etc/apt/sources.list.d/till-boot.list
 
 echo "chroot-setup done"

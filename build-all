@@ -4,8 +4,8 @@
 
 set -e
 
-pc_distro=bullseye
-rpi_distro=bullseye
+pc_distro=bookworm
+rpi_distro=bookworm
 
 parallel --progress --bar <<EOF
 ./build-rdir pc $pc_distro amd64 rdir-pc-amd64 >rdir-pc-amd64-buildlog 2>&1

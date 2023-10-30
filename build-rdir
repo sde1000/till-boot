@@ -13,11 +13,29 @@ arch=$3
 target=$4
 
 case ${platform} in
+    pc|rpi)
+	true
+	;;
+    *)
+	echo "Warning: unsupported platform ${platform}"
+	;;
+esac
+
+case ${distribution} in
+    bullseye|bookworm)
+	true
+	;;
+    *)
+	echo "Warning: unsupported distribution ${distribution}"
+	;;
+esac
+
+case ${platform} in
     pc)
-	chromium_packages="chromium chromium-l10n"
+	browser_packages="firefox-esr"
 	;;
     rpi)
-	chromium_packages="chromium-browser chromium-browser-l10n rpi-chromium-mods"
+	browser_packages="firefox rpi-firefox-mods"
 	;;
 esac
 
@@ -49,16 +67,25 @@ tcpdump
 python3-twython
 python3-oauthlib
 python3-requests
-python3-matplotlib
 wget
 man-db
 python3-dateutil
 python3-markupsafe
+python3-jinja2
 quicktill-serial-barcode-bridge
 efibootmgr
 lsb-release
+zstd
 EOF
 			 )
+
+# XXX problem: luit is incompatible with x11-utils in bookworm
+# chromium brings in x11-utils - what brings in luit?
+
+# It looks like this is a long-standing (since Feb 2022) bug in Debian
+# which will only be resolved when x11-utils is updated.
+
+# Switch to Firefox instead?
 
 extrainstall_recommends=$(cat <<EOF
 xinit
@@ -76,7 +103,7 @@ sntp
 systemd-timesyncd
 initramfs-tools
 busybox
-${chromium_packages}
+${browser_packages}
 EOF
 		       )
 
@@ -112,7 +139,7 @@ case ${platform} in
 		xserver=xserver-xorg
 		kernel=linux-generic-hwe-20.04
 		;;
-	    buster|bullseye)
+	    buster|bullseye|bookworm)
 		upstream=debian
 		xserver=
 		case ${arch} in
@@ -137,14 +164,27 @@ case ${platform} in
 	extrainstall_norecommends="${extrainstall_norecommends} ${kernel}"
 	;;
     rpi)
+	case ${distribution} in
+	    bookworm)
+		case ${arch} in
+		    armhf)
+			kernel="raspi-firmware linux-image-rpi-v6 linux-image-rpi-v7 linux-image-rpi-v7l linux-image-rpi-v8"
+		        ;;
+		    arm64)
+			kernel="raspi-firmware linux-image-rpi-2712 linux-image-rpi-v8"
+			;;
+		esac
+		;;
+	    *)
+		kernel="raspberrypi-kernel raspberrypi-bootloader"
+		;;
+	esac
 	case ${arch} in
 	    armhf)
 		upstream=raspbian
-		kernel="raspberrypi-kernel raspberrypi-bootloader"
 		;;
 	    arm64)
 		upstream=debian
-		kernel="raspberrypi-kernel raspberrypi-bootloader"
 		;;
 	    *)
 		echo "Unknown rpi arch ${arch}"
@@ -222,14 +262,12 @@ EOF
 	;;
 esac
 
-# Work out whether we are cross-building
-crossbuild=true
-if [ "${arch}" = "$(dpkg --print-architecture)" ]; then
-    crossbuild=
-fi
-if [ "${arch}" = "$(dpkg --print-foreign-architectures)" ]; then
-    crossbuild=
-fi
+echo Will install these packages plus recommendations:
+echo ${extrainstall_recommends}
+echo
+echo Will install these packages without their recommended extras:
+echo ${extrainstall_norecommends}
+echo
 
 echo Building ${platform} ${distribution}-${arch} chroot in ${target}
 
@@ -241,13 +279,8 @@ imginfo_json=${target}-image-info.json
 rm -rf $target $manifest $diskdefines $imginfo $imginfo_json
 mkdir $target
 
-if [ $crossbuild ]; then
-    echo Running qemu-debootstrap
-    qemu-debootstrap ${debootstrap_keyring} --arch=${arch} $distribution $target $source 2>&1
-else
-    echo Running debootstrap
-    debootstrap ${debootstrap_keyring} --arch=${arch} $distribution $target $source 2>&1
-fi
+echo Running debootstrap
+debootstrap ${debootstrap_keyring} --arch=${arch} $distribution $target $source 2>&1
 
 # Use the http proxy if configured
 if [ "${http_proxy}" ]; then
@@ -273,6 +306,7 @@ echo $extrainstall_recommends >$target/root/extrainstall_recommends
 cat >$target/root/chroot-config <<EOF
 platform=$platform
 arch=$arch
+distribution=$distribution
 EOF
 
 # Invoke the setup script in the target
@@ -365,19 +399,37 @@ append:
  - boot=${boot}
 EOF
 if [ "${platform}" = "rpi" ]; then
-    cat >>${imginfo} <<EOF
+    if [ "${distribution}" != "bookworm" ]; then
+	cat >>${imginfo} <<EOF
  - console=tty1
  - net.ifnames=0
  - ethdevice-timeout=30
+ - disable_overscan=1
 config-pi4:
-  - dtoverlay=vc4-fkms-v3d
-  - max_framebuffers=2
+ - dtoverlay=vc4-fkms-v3d
+ - max_framebuffers=2
 config:
-  - dtoverlay=audio=on
+ - dtoverlay=audio=on
 EOF
+    else
+	cat >>${imginfo} <<EOF
+ - console=tty1
+ - net.ifnames=0
+ - ethdevice-timeout=30
+config-cm4:
+ - otg_mode=1
+config:
+ - dtparam=audio=on
+ - auto_initramfs=1
+ - dtoverlay=vc4-kms-v3d
+ - max_framebuffers=2
+ - disable_fw_kms_setup=1
+ - disable_overscan=1
+EOF
+    fi
     if [ "${arch}" = "arm64" ]; then
 	cat >>${imginfo} <<EOF
-  - arm_64bit=1
+ - arm_64bit=1
 EOF
     fi
 fi

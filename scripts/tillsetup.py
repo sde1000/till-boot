@@ -5,16 +5,16 @@ network-booted system.
 
 import sys
 import time
-import string
 import requests
 import subprocess
 import yaml
-import os
+
 
 _true_strings = (
     'y', 'Y', 'yes', 'Yes', 'YES', 'true', 'True', 'TRUE', 'on', 'On', 'ON')
 _false_strings = (
     'n', 'N', 'no', 'No', 'NO', 'false', 'False', 'FALSE', 'off', 'Off', 'OFF')
+
 
 def get_boolean(d, k, default=None):
     # There is some confusion in yaml regarding whether unquoted
@@ -37,19 +37,45 @@ def get_boolean(d, k, default=None):
         return False
     return i
 
+
 def bail(problem):
     print(problem)
     sys.exit(1)
+
+
+def fetch_config(cmdline_config):
+    # Transition period: use till-boot-config-json if present,
+    # otherwise use till-boot-config and treat it as yaml
+
+    boot_config_json = cmdline_config.get("till-boot-config-json")
+    if boot_config_json:
+        try:
+            r = requests.get(boot_config_json)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            print(e)
+            bail(f"exception fetching config from {boot_config_json}")
+
+    boot_config = cmdline_config.get("till-boot-config")
+    if not boot_config:
+        bail("till-boot-config kernel command line parameter not set")
+    try:
+        r = requests.get(boot_config)
+        r.raise_for_status()
+        return yaml.safe_load(r.text)
+    except Exception as e:
+        print(e)
+        bail(f"exception fetching config from {boot_config}")
+
 
 def run():
     try:
         with open("tillsetup-cmdline") as f:
             cmdline = f.readline()
-            testing = True
     except FileNotFoundError:
         with open("/proc/cmdline") as f:
             cmdline = f.readline()
-            testing = False
 
     words = cmdline.split()
     cmdline_config = {}
@@ -63,22 +89,8 @@ def run():
     boot_version = cmdline_config.get("till-boot-version")
     if not boot_version:
         bail("till-boot-version kernel command line parameter not set")
-    boot_config = cmdline_config.get("till-boot-config")
-    if not boot_config:
-        bail("till-boot-config kernel command line parameter not set")
-    try:
-        r = requests.get(boot_config)
-    except Exception as e:
-        print(e)
-        bail(f"exception fetching config from {boot_config}")
-    if r.status_code != 200:
-        bail(f"response code {r.status_code} fetching config from {r.url}")
 
-    try:
-        config = yaml.safe_load(r.text)
-    except Exception as e:
-        print(e)
-        bail(f"problem reading configuration from {r.url}")
+    config = fetch_config(cmdline_config)
 
     if "version" not in config:
         bail("no 'version' key present in configuration")
@@ -110,7 +122,9 @@ def run():
         f.write(f"{mode}\n")
 
     with open("display-url", "w") as f:
-        f.write(f"{config.get('display-url', 'https://quicktill.assorted.org.uk')}\n")
+        dispurl = config.get(
+            'display-url', 'https://quicktill.assorted.org.uk')
+        f.write(f"{dispurl}\n")
 
     # Add apt respositories
     with open("apt-sources.list", "w") as f:
@@ -167,6 +181,7 @@ def run():
         f.write('  -e 20 "Power off till" \\\n')
         f.write('  -e 30 "Reboot till" \\\n')
         f.write('  -i 40\n')
+
 
 if __name__ == '__main__':
     run()

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -e
+
+rm -f till-boot-{pc,rpi}-*.deb till-boot-loaders_*_all.deb

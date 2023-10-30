@@ -1,3 +1,9 @@
+till-boot-config (13) stable; urgency=medium
+
+  * Updates for new /boot/firmware convention in rpi bookworm
+
+ -- Stephen Early <steve@assorted.org.uk>  Mon, 30 Oct 2023 23:02:48 +0000
+
 till-boot-config (12) stable; urgency=medium
 
   * Start migrating to toml/json from yaml
