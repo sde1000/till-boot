@@ -5,28 +5,7 @@ if [ "$(tty)" = "/dev/tty1" ]; then
     sleep 30
     sudo reboot
   fi
-  if [ "$(cat mode)" = "maintenance" ]; then
-    echo "System is in maintenance mode; till will not be started."
-    echo -n "Last checked: "
-    date
-    echo
-    cat maintenance-message
-    echo
-    sleep 30
-    exit
-  fi
-  sudo apt-get update
-  sudo apt-get -y dist-upgrade
-  if test -f printserver; then
-    sudo ./set-printserver.sh
-  fi
-  if test -f install; then
-    sudo apt-get -y install $(cat install)
-  fi
-  (umask 077 ; touch .Xauthority)
-  if [ "$(cat pointer)" = "no" ]; then
-    exec startx ./mode-$(cat mode) -- -nocursor
-  else
-    exec startx ./mode-$(cat mode)
-  fi
+
+  exec ./startup.sh
+
 fi

@@ -74,8 +74,12 @@ python3-markupsafe
 python3-jinja2
 quicktill-serial-barcode-bridge
 efibootmgr
+ethtool
 lsb-release
 zstd
+polkitd
+binutils
+jq
 EOF
 			 )
 
@@ -88,21 +92,34 @@ EOF
 # Switch to Firefox instead?
 
 extrainstall_recommends=$(cat <<EOF
-xinit
 python3-gi-cairo
 gir1.2-gtk-3.0
 fonts-ubuntu
 fonts-symbola
 fonts-liberation
-xterm
-mutter
-x11-xserver-utils
 python3-pil
 console-setup
 sntp
 systemd-timesyncd
+systemd-resolved
 initramfs-tools
 busybox
+wayfire
+wlr-randr
+lxterminal
+fonts-cantarell
+fonts-dejavu
+fonts-droid-fallback
+fonts-freefont-ttf
+fonts-liberation2
+fonts-quicksand
+fonts-symbola
+fonts-opensymbol
+xfonts-100dpi
+xfonts-75dpi
+xfonts-base
+xfonts-scalable
+zenity
 ${browser_packages}
 EOF
 		       )
@@ -285,7 +302,7 @@ debootstrap ${debootstrap_keyring} --arch=${arch} $distribution $target $source 
 # Use the http proxy if configured
 if [ "${http_proxy}" ]; then
     cat >$target/etc/apt/apt.conf.d/40proxy <<EOF
-Acquire::http::Proxy "$http_proxy";
+Acquire::http::Proxy "${http_proxy}";
 EOF
 fi
 
@@ -349,7 +366,9 @@ rm $target/root/extrainstall_recommends
 rm $target/root/chroot-config
 rm -r $target/root/scripts
 
-# Clear the apt sources list
+# Move the apt sources list out of the way — it can be restored manually
+# for development
+cp $target/etc/apt/sources.list $target/root/sources.list
 cat >$target/etc/apt/sources.list <<EOF
 EOF
 
@@ -399,23 +418,38 @@ append:
  - boot=${boot}
 EOF
 if [ "${platform}" = "rpi" ]; then
+    # PI-specific notes:
+
+    # net.ifnames=0 ensures the first (and only) ethernet interface is
+    # called eth0 (not sure if this is strictly necessary any more...)
+
+    # ethdevice-timeout=30 enables the initrd to keep trying dhcp
+    # until it can get a reply — the default timeout is too low
+
+    # usbhid.mousepoll=0 restores the usual default for this
+    # parameter, which means "trust what the USB device says" — PI
+    # kernels have a non-standard default which prevents many
+    # touchscreens working
+
     if [ "${distribution}" != "bookworm" ]; then
 	cat >>${imginfo} <<EOF
  - console=tty1
  - net.ifnames=0
  - ethdevice-timeout=30
- - disable_overscan=1
+ - usbhid.mousepoll=0
 config-pi4:
  - dtoverlay=vc4-fkms-v3d
  - max_framebuffers=2
 config:
  - dtoverlay=audio=on
+ - disable_overscan=1
 EOF
     else
 	cat >>${imginfo} <<EOF
  - console=tty1
  - net.ifnames=0
  - ethdevice-timeout=30
+ - usbhid.mousepoll=0
 config-cm4:
  - otg_mode=1
 config:

@@ -90,8 +90,15 @@ install -m 755 /root/scripts/tillsetup.py /usr/local/sbin/tillsetup
 echo " --> adding mode scripts to till user's home directory"
 install -m 755 -o till -g till /root/scripts/mode-*[^~] /home/till/
 
-echo " --> adding set-printserver script to till user's home directory"
-install -m 755 -o till -g till /root/scripts/set-printserver.sh /home/till/set-printserver.sh
+echo " --> adding wayland logout script to till user's home directory"
+install -m 755 -o till -g till /root/scripts/wayland-logout.py /home/till/
+
+echo " --> copying default wayfire config"
+mkdir -p /etc/wayfire
+install -m 644 -o root -g root /root/scripts/defaults.ini /etc/wayfire/defaults.ini
+
+echo " --> adding shell scripts to till user's home directory"
+install -m 755 -o till -g till /root/scripts/*.sh /home/till/
 
 echo " --> updating till user's .profile"
 cat /root/scripts/profile-fragment >>/home/till/.profile

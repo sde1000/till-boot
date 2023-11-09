@@ -8,34 +8,7 @@ import time
 import requests
 import subprocess
 import yaml
-
-
-_true_strings = (
-    'y', 'Y', 'yes', 'Yes', 'YES', 'true', 'True', 'TRUE', 'on', 'On', 'ON')
-_false_strings = (
-    'n', 'N', 'no', 'No', 'NO', 'false', 'False', 'FALSE', 'off', 'Off', 'OFF')
-
-
-def get_boolean(d, k, default=None):
-    # There is some confusion in yaml regarding whether unquoted
-    # 'yes', 'no', etc. get turned into strings or booleans. The
-    # specification changed between yaml 1.1 and 1.2. Depending on how
-    # whoever wrote the configuration file quoted their options, we
-    # may end up with a real boolean, or one of the _true_strings or
-    # _false_strings above (which are taken from the yaml 1.1
-    # spec). Or possibly something else!
-
-    # We return the default if the key is not present. If one of the
-    # _true_strings or _false_strings is present we return True or
-    # False. Otherwise we return the contents of the key unchanged.
-    if k not in d:
-        return default
-    i = d[k]
-    if i in _true_strings:
-        return True
-    if i in _false_strings:
-        return False
-    return i
+import json
 
 
 def bail(problem):
@@ -109,78 +82,20 @@ def run():
         time.sleep(60)
         bail("did not reboot in time!")
 
-    mode = config.get("mode", "till")
+    # Dump the config to the home directory
+    with open("config.json", "w") as f:
+        json.dump(config, f, indent=2)
 
-    mm = "maintenance-message"
-    if config.get(mm):
-        mode = "maintenance"
-        with open(mm, "w") as f:
-            f.write(config[mm])
-            f.write("\n")
-
-    with open("mode", "w") as f:
-        f.write(f"{mode}\n")
-
-    with open("display-url", "w") as f:
-        dispurl = config.get(
-            'display-url', 'https://quicktill.assorted.org.uk')
-        f.write(f"{dispurl}\n")
-
-    # Add apt respositories
-    with open("apt-sources.list", "w") as f:
-        for r in config.get("repos", []):
-            f.write(f"{r}\n")
-
-    with open("install", "w") as f:
-        install = config.get("install", []) + config.get("extra-install", [])
-        f.write(f"{' '.join(install)}\n")
-
-    dbstring = []
-    if "dbname" in config:
-        dbstring.append("dbname=" + config["dbname"])
-    if "dbhost" in config:
-        dbstring.append("host=" + config["dbhost"])
-    if "dbuser" in config:
-        dbstring.append("user=" + config["dbuser"])
-    if "dbpassword" in config:
-        dbstring.append("password=" + config["dbpassword"])
-    database = " ".join(dbstring)
-
-    configname = config.get("configname", "default")
-
-    fontsize = config.get("fontsize", "20")
-
-    pointer = get_boolean(config, "pointer", default=False)
-
-    with open("pointer", "w") as f:
-        f.write(f"{'yes' if pointer else 'no'}\n")
-
-    printserver = config.get("printserver", None)
-
-    if printserver:
-        with open("printserver", "w") as f:
-            f.write(f"{printserver}\n")
-
-    with open("runtill-command", "w") as f:
-        f.write("runtill \\\n")
-        if "configurl" in config:
-            f.write(f'  -u "{config["configurl"]}" \\\n')
-        f.write(f'  -c "{configname}" \\\n')
-        f.write(f'  -d "{database}" \\\n')
-        f.write('  start \\\n')
-        f.write('  --gtk --fullscreen \\\n')
-        # yaml awkwardness: 'keyboard' may be a boolean or a string
-        keyboard = get_boolean(config, "keyboard", default=True)
-        if keyboard:
-            f.write('  --keyboard \\\n')
-            if keyboard == "onscreen-only":
-                f.write('  --no-hardware-keyboard \\\n')
-        f.write(f'  --font="sans {fontsize}" \\\n')
-        f.write(f'  --monospace-font="monospace {fontsize}" \\\n')
-        f.write('  -e 0 "Restart till software" \\\n')
-        f.write('  -e 20 "Power off till" \\\n')
-        f.write('  -e 30 "Reboot till" \\\n')
-        f.write('  -i 40\n')
+    # Fetch files, overwriting existing files if required
+    fetch = config.get("fetch", {})
+    for filename, url in fetch.items():
+        try:
+            r = requests.get(url)
+            r.raise_for_status()
+            with open(filename, 'wb') as f:
+                f.write(r.content)
+        except Exception:
+            print(f"failed to fetch {url} as {filename}")
 
 
 if __name__ == '__main__':

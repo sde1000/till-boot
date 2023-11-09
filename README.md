@@ -55,19 +55,13 @@ debian or raspberry pi os
 
 ## Currently working
 
-* pc focal amd64
-* pc buster {i386,amd64}
-* pc bullseye {i386,amd64}
-* rpi buster armhf
-* rpi bullseye {armhf,arm64}
+(But see bug list at end.)
 
-## Currently not working
+* pc bookworm {i386,amd64}
+* rpi bookworm {armhf,arm64}
 
-* pc bionic {i386,amd64} (freezes at startup)
-
-## Will never work
-
-* pc focal i386 (focal drops i386 support)
+bullseye could be made to work again with additional scripts to choose
+between wayfire and X
 
 
 # How platforms boot
@@ -116,3 +110,11 @@ specified on the kernel command line in the `cmdline.txt` file. The
 squashfs image is loopback mounted, and an overlayfs is created to
 enable ramdisk-backed write to the image. The image is then started
 with the overlayfs as the root filesystem.
+
+# TODO / bugs for bookworm
+
+wayfire plugin to call seat::cursor::set_touchscreen_mode(true) on init?
+
+Fonts look a bit off — the baseline for the proportional font appears
+to be too high compared to the monospace font. This doesn't happen on
+bullseye. Entirely possible it's a bug in quicktill, though.

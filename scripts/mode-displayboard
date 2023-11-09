@@ -1,12 +1,37 @@
 #!/bin/bash
 
-# This script invokes a web browser, full-screen
-# It lives in /home/till/
+cat >wayfire-displayboard.ini <<EOF
+[core]
+plugins = animate autostart command fast-switcher grid idle move place switcher window-rules wm-actions
+plugins_nogl = animate autostart command fast-switcher grid idle move place switcher window-rules wm-actions
+xwayland = false
 
-mutter &
-xset s off
-xset -dpms
-xset s noblank
-x-www-browser --start-fullscreen $(cat display-url)
-sleep 1
-exit
+[command]
+binding_terminal = <ctrl> <alt> KEY_T
+command_terminal = lxterminal
+binding_quit = <ctrl> <alt> KEY_DELETE
+command_quit = /usr/sbin/reboot
+binding_power = KEY_POWER
+command_power = /usr/sbin/poweroff
+
+[input]
+xkb_model = pc105
+xkb_layout = gb
+xkb_variant =
+
+[idle]
+screensaver_timeout = -1
+dpms_timeout = -1
+
+[autostart]
+autostart_wf_shell = false
+displayboard = /usr/bin/firefox --override /home/till/firefox-kiosk.ini --kiosk --private-window $(jq -r '."display-url" // "https://quicktill.assorted.org.uk/"' config.json)
+
+EOF
+
+cat >firefox-kiosk.ini <<EOF
+[XRE]
+EnableProfileMigrator=false
+EOF
+
+exec wayfire -c wayfire-displayboard.ini
