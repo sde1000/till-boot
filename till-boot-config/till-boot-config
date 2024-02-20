@@ -351,6 +351,8 @@ def run():
             cf = cf[:-5]
             with open(cf) as f:
                 config = yaml.safe_load(f)
+            log.warning("legacy yaml config file '%s' loaded; please update "
+                        "to toml", cf)
 
     nfs_dir = path_or_fail(config, args.nfs_dir, "nfs-dir")
     tftp_dir = path_or_fail(config, args.tftp_dir, "tftp-dir")
