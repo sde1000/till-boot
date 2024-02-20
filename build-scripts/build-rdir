@@ -72,6 +72,7 @@ man-db
 python3-dateutil
 python3-markupsafe
 python3-jinja2
+python3-tomli
 quicktill-serial-barcode-bridge
 efibootmgr
 ethtool
@@ -316,7 +317,7 @@ EOF
 cp $repokey $target/etc/apt/trusted.gpg.d/repo-signing-key.asc
 
 # Copy the setup script into the target
-cp -r scripts $target/root/
+cp -r target-scripts $target/root/scripts
 echo $extrainstall_norecommends >$target/root/extrainstall_norecommends
 echo $extrainstall_recommends >$target/root/extrainstall_recommends
 

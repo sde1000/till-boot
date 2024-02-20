@@ -1,0 +1,2 @@
+These scripts run on the host system to build the target root
+directory, make the squashfs and build the Debian packages.
