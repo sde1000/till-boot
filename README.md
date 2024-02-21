@@ -113,8 +113,15 @@ with the overlayfs as the root filesystem.
 
 # TODO / bugs for bookworm
 
-wayfire plugin to call seat::cursor::set_touchscreen_mode(true) on init?
+wayfire plugin to call seat::cursor::set_touchscreen_mode(true) on
+init?  (There's a "hide_cursor" plugin in wayfire-plugins-extra —
+maybe compile and package that and include it in the image? See
+https://github.com/seffs/wayfire-plugins-extra-raspbian )
 
 Fonts look a bit off — the baseline for the proportional font appears
 to be too high compared to the monospace font. This doesn't happen on
-bullseye. Entirely possible it's a bug in quicktill, though.
+bullseye. Entirely possible it's a bug in quicktill,
+though. Workaround: added a pitch adjustment command line parameter.
+
+Need a way for quicktill to unblank the screen on receiving a
+usertoken. Some way for it to speak Wayland idle protocol?

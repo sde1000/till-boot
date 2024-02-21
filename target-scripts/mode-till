@@ -24,6 +24,8 @@ xkb_variant =
 [idle]
 screensaver_timeout = -1
 dpms_timeout = $(jq '."screen-blank-timeout" // 300' config.json)
+disable_on_fullscreen = false
+toggle = none
 
 [autostart]
 autostart_wf_shell = false
@@ -44,6 +46,7 @@ runtill \\
     $(jq -r 'if (.keyboard // false) == "onscreen-only" then "--no-hardware-keyboard" else "" end' config.json) \\
     --font="sans $(jq -r '.fontsize // 20' config.json)" \\
     --monospace-font="monospace $(jq -r '.fontsize // 20' config.json)" \\
+    --pitch-adjust="$(jq -r '.pitchadjust // 0' config.json)" \\
     -e 0 "Restart till software" \\
     -e 20 "Power off till" \\
     -e 30 "Reboot till" \\
