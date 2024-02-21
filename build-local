@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e
+
+if [ "$#" != "4" ]; then
+    echo "Usage: build-local platform distribution arch version"
+    exit 1
+fi
+
+platform=$1
+distribution=$2
+arch=$3
+version=$4
+
+rdir=rdir-${platform}-${arch}
+
+./build-scripts/build-rdir \
+  $platform $distribution $arch $rdir \
+  >${rdir}-buildlog 2>&1
+
+./build-scripts/build-deb ${platform} ${arch} ${rdir} ${version}

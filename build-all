@@ -7,17 +7,15 @@ set -e
 pc_distro=bookworm
 rpi_distro=bookworm
 
-parallel --progress --bar <<EOF
-./build-scripts/build-rdir pc $pc_distro amd64 rdir-pc-amd64 >rdir-pc-amd64-buildlog 2>&1
-./build-scripts/build-rdir pc $pc_distro i386 rdir-pc-i386 >rdir-pc-i386-buildlog 2>&1
-./build-scripts/build-rdir rpi $rpi_distro armhf rdir-rpi-armhf >rdir-rpi-armhf-buildlog 2>&1
-./build-scripts/build-rdir rpi $rpi_distro arm64 rdir-rpi-arm64 >rdir-rpi-arm64-buildlog 2>&1
+version=$(date +%Y%m%d%H%M%S)
+
+parallel --progress --bar --halt now,fail=1 <<EOF
+./build-local pc $pc_distro amd64 ${version}
+./build-remote steve@army rpi $rpi_distro arm64 ${version}
 EOF
 
-version=$(date +%Y%m%d%H%M%S)
-./build-scripts/build-deb pc amd64 rdir-pc-amd64 ${version}
-./build-scripts/build-deb pc i386 rdir-pc-i386 ${version}
-./build-scripts/build-deb rpi armhf rdir-rpi-armhf ${version}
-./build-scripts/build-deb rpi arm64 rdir-rpi-arm64 ${version}
+# The following are no longer built because nobody is using them
+#./build-local pc $pc_distro i386 ${version}
+#./build-remote steve@army rpi $rpi_distro armhf ${version}
 
 ./build-loaders-deb ${version}

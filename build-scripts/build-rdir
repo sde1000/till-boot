@@ -470,4 +470,4 @@ EOF
 fi
 
 # Image info file, JSON version
-./yaml2json.py <${imginfo} >${imginfo_json}
+./build-scripts/yaml2json.py <${imginfo} >${imginfo_json}

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -e
+
+if [ "$#" != "5" ]; then
+    echo "Usage: build-remote host platform distribution arch version"
+    exit 1
+fi
+
+host=$1
+platform=$2
+distribution=$3
+arch=$4
+version=$5
+
+builddir=till-boot-build-${platform}-${distribution}-${arch}-${version}
+rdir=rdir-${platform}-${arch}
+
+sshopts="-oBatchMode=yes -T"
+
+# Create a build environment on the remote host
+ssh ${sshopts} ${host} mkdir -p ${builddir}
+tar cf - build-scripts target-scripts keys | ssh ${sshopts} ${host} "cd ${builddir} ; tar xf -"
+
+ssh ${sshopts} ${host} "cd ${builddir} ; sudo ./build-scripts/build-rdir $platform $distribution $arch $rdir >${rdir}-buildlog 2>&1"
+
+ssh ${sshopts} ${host} "cd ${builddir} ; sudo ./build-scripts/build-deb ${platform} ${arch} ${rdir} ${version}"
+
+scp ${host}:${builddir}/till-boot-${platform}-${arch}-${version}_1_all.deb .
+scp ${host}:${builddir}/till-boot-${platform}-${arch}_${version}_all.deb .
+
+ssh ${sshopts} ${host} "sudo rm -rf ${builddir}"
