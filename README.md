@@ -11,7 +11,7 @@ You must be (real) root when running the image build scripts.
 Required packages:
 
 ```
-debootstrap squashfs-tools systemd-container qemu-user-static binfmt-support wget parallel debhelper
+debootstrap squashfs-tools systemd-container qemu-user-static binfmt-support wget parallel debhelper debian-archive-keyring
 ```
 
 To build the boot image and loaders package, as root:
