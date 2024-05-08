@@ -47,6 +47,7 @@ runtill \\
     --font="sans $(jq -r '.fontsize // 20' config.json)" \\
     --monospace-font="monospace $(jq -r '.fontsize // 20' config.json)" \\
     --pitch-adjust="$(jq -r '.pitchadjust // 0' config.json)" \\
+    --baseline-adjust="$(jq -r '.baselineadjust // 0' config.json)" \\
     -e 0 "Restart till software" \\
     -e 20 "Power off till" \\
     -e 30 "Reboot till" \\
