@@ -73,6 +73,7 @@ python3-dateutil
 python3-markupsafe
 python3-jinja2
 python3-tomli
+python3-imagesize
 quicktill-serial-barcode-bridge
 efibootmgr
 ethtool
