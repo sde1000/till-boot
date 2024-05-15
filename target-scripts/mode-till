@@ -38,6 +38,7 @@ cat >runtill-script.sh <<EOF
 runtill \\
   -u $(jq -r .configurl config.json) \\
   -c $(jq -r '.configname // "default"' config.json) \\
+  -t $(jq -r '.terminalname // .configname // "default"' config.json) \\
   -d "${database}" \\
   start \\
     --gtk \\
