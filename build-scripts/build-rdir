@@ -139,7 +139,7 @@ function setup_post_chroot { :; }
 
 case ${platform} in
     pc)
-	extrainstall_norecommends="${extrainstall_norecommends} dmidecode"
+	extrainstall_norecommends="${extrainstall_norecommends} dmidecode firmware-linux firmware-realtek"
 	function setup_post_chroot {
 	    # For some reason the "lp" module is not loaded
 	    # automatically, so we have to add it to /etc/modules
@@ -245,17 +245,17 @@ EOF
 	boot=live
 	function setup_apt_sources {
 	    cat >$target/etc/apt/sources.list <<EOF
-deb http://deb.debian.org/debian/ $distribution main contrib non-free
-deb-src http://deb.debian.org/debian/ $distribution main contrib non-free
+deb http://deb.debian.org/debian/ $distribution main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ $distribution main contrib non-free non-free-firmware
 
-deb http://security.debian.org/debian-security $distribution/updates main contrib non-free
-deb-src http://security.debian.org/debian-security $distribution/updates main contrib non-free
+deb http://security.debian.org/debian-security $distribution/updates main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security $distribution/updates main contrib non-free non-free-firmware
 
-deb http://deb.debian.org/debian/ $distribution-updates main contrib non-free
-deb-src http://deb.debian.org/debian/ $distribution-updates main contrib non-free
+deb http://deb.debian.org/debian/ $distribution-updates main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ $distribution-updates main contrib non-free non-free-firmware
 
-deb http://deb.debian.org/debian/ $distribution-backports main contrib non-free
-deb-src http://deb.debian.org/debian/ $distribution-backports main contrib non-free
+deb http://deb.debian.org/debian/ $distribution-backports main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ $distribution-backports main contrib non-free non-free-firmware
 EOF
 	    cat >$target/etc/apt/preferences <<EOF
 Package: linux-image-*
