@@ -30,22 +30,13 @@ case ${distribution} in
 	;;
 esac
 
-case ${platform} in
-    pc)
-	browser_packages="firefox-esr"
-	;;
-    rpi)
-	browser_packages="firefox rpi-firefox-mods"
-	;;
-esac
-
 if [ ${UID} != 0 ]; then
   echo "This script must be run as root."
   exit 1
 fi
 
 # Common configuration
-extrainstall_norecommends=$(cat <<EOF
+extrainstall_norecommends=$(sed 's/#.*$//;/^$/d' <<EOF
 postgresql-client
 openssh-client
 acpid
@@ -64,9 +55,9 @@ python3-odf
 telnet
 strace
 tcpdump
-python3-twython
 python3-oauthlib
 python3-requests
+python3-requests-oauthlib
 wget
 man-db
 python3-dateutil
@@ -84,17 +75,11 @@ jq
 EOF
 			 )
 
-# XXX problem: luit is incompatible with x11-utils in bookworm
-# chromium brings in x11-utils - what brings in luit?
-
-# It looks like this is a long-standing (since Feb 2022) bug in Debian
-# which will only be resolved when x11-utils is updated.
-
-# Switch to Firefox instead?
-
-extrainstall_recommends=$(cat <<EOF
+extrainstall_recommends=$(sed 's/#.*$//;/^$/d' <<EOF
 python3-gi-cairo
 gir1.2-gtk-3.0
+gir1.2-gtk-4.0
+gir1.2-webkit-6.0
 fonts-ubuntu
 fonts-symbola
 fonts-liberation
@@ -103,6 +88,8 @@ console-setup
 sntp
 systemd-timesyncd
 systemd-resolved
+# Needed so dynamic usernames can be resolved
+libnss-systemd
 initramfs-tools
 busybox
 wayfire
@@ -121,7 +108,6 @@ xfonts-75dpi
 xfonts-base
 xfonts-scalable
 zenity
-${browser_packages}
 EOF
 		       )
 
