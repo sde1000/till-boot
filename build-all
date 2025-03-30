@@ -4,7 +4,7 @@
 
 set -e
 
-pc_distro=bookworm
+pc_distro=trixie
 rpi_distro=bookworm
 
 version=$(date +%Y%m%d%H%M%S)

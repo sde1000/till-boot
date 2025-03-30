@@ -58,6 +58,7 @@ apt-get -q -y dist-upgrade
 
 echo " --> enabling systemd-networkd and systemd-resolved"
 systemctl enable systemd-networkd
+# XXX systemd-resolved isn't present on Debian trixie?
 systemctl enable systemd-resolved
 
 echo " --> choosing UK keyboard"
@@ -79,7 +80,8 @@ echo " --> adding till user"
 adduser --add_extra_groups --gecos Till --disabled-password till
 adduser till adm
 adduser till sudo
-adduser till lpadmin
+# lpadmin doesn't exist on Debian trixie
+# adduser till lpadmin
 adduser till lp
 passwd -d till
 passwd -d root
@@ -93,9 +95,8 @@ install -m 755 -o till -g till /root/scripts/mode-*[^~] /home/till/
 echo " --> adding wayland logout script to till user's home directory"
 install -m 755 -o till -g till /root/scripts/wayland-logout.py /home/till/
 
-echo " --> copying default wayfire config"
-mkdir -p /etc/wayfire
-install -m 644 -o root -g root /root/scripts/defaults.ini /etc/wayfire/defaults.ini
+echo " --> adding display browser to till user's home directory"
+install -m 755 -o till -g till /root/scripts/display-browser.py /home/till/
 
 echo " --> adding shell scripts to till user's home directory"
 install -m 755 -o till -g till /root/scripts/*.sh /home/till/

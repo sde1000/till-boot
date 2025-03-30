@@ -7,7 +7,6 @@ import sys
 import time
 import requests
 import subprocess
-import yaml
 import json
 
 
@@ -17,29 +16,17 @@ def bail(problem):
 
 
 def fetch_config(cmdline_config):
-    # Transition period: use till-boot-config-json if present,
-    # otherwise use till-boot-config and treat it as yaml
-
     boot_config_json = cmdline_config.get("till-boot-config-json")
-    if boot_config_json:
-        try:
-            r = requests.get(boot_config_json)
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            print(e)
-            bail(f"exception fetching config from {boot_config_json}")
+    if not boot_config_json:
+        bail("till-boot-config-json kernel command line parameter not set")
 
-    boot_config = cmdline_config.get("till-boot-config")
-    if not boot_config:
-        bail("till-boot-config kernel command line parameter not set")
     try:
-        r = requests.get(boot_config)
+        r = requests.get(boot_config_json)
         r.raise_for_status()
-        return yaml.safe_load(r.text)
+        return r.json()
     except Exception as e:
         print(e)
-        bail(f"exception fetching config from {boot_config}")
+        bail(f"exception fetching config from {boot_config_json}")
 
 
 def run():

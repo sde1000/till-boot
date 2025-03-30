@@ -1,50 +1,83 @@
 #!/bin/bash
 
+echo
+echo "Starting till..."
+
 database=$(jq -r '{dbname: .dbname, host: .dbhost, user: .dbuser, password: .dbpassword} | to_entries | map(select(.value != null)) | map(.key+"="+.value) | join(" ")' config.json)
 
-cat >wayfire-till.ini <<EOF
-[core]
-plugins = animate autostart command fast-switcher grid idle move place switcher window-rules wm-actions
-plugins_nogl = animate autostart command fast-switcher grid idle move place switcher window-rules wm-actions
-xwayland = false
+# Default screen blanking to "off" if not configured
+screenblank=$(jq '."screen-blank-timeout" // -1' config.json)
 
-[command]
-binding_terminal = <ctrl> <alt> KEY_T
-command_terminal = lxterminal
-binding_quit = <ctrl> <alt> KEY_DELETE
-command_quit = /usr/sbin/reboot
-binding_power = KEY_POWER
-command_power = /usr/sbin/poweroff
+if [ $(jq '.debug // false' config.json) != "false" ]; then
+    echo "Debug mode"
+    echo "Database: ${database}"
+    echo "Screen blank: ${screenblank}"
+    sleep 2
+fi
 
-[input]
-xkb_model = pc105
-xkb_layout = gb
-xkb_variant =
+# labwc doesn't have an option to hide the pointer yet. A HideCursor
+# action that can be run on startup was added on 25/3/2025 but will
+# take some time to make it through to a release! We need to use the
+# --hide-pointer quicktill option instead, for now.
 
-[idle]
-screensaver_timeout = -1
-dpms_timeout = $(jq '."screen-blank-timeout" // 300' config.json)
-disable_on_fullscreen = false
-toggle = none
+# Ensure we start with a fresh labwc configuration directory
+labwc_config=mode-till-labwc-config
+rm -rf ${labwc_config}
+mkdir ${labwc_config}
 
-[autostart]
-autostart_wf_shell = false
-till = /home/till/runtill-script.sh
+# XXX We should make the xkb settings configurable — allow them to be
+# set for the OS tty as well as the compositor!
+cat >${labwc_config}/environment <<EOF
+XKB_DEFAULT_LAYOUT=gb
 EOF
+
+cat >${labwc_config}/rc.xml <<EOF
+<?xml version="1.0"?>
+<labwc_config>
+<keyboard>
+<keybind key="A-Tab">
+  <action name="NextWindow" />
+</keybind>
+<keybind key="A-S-Tab">
+  <action name="PreviousWindow" />
+</keybind>
+<keybind key="A-F4">
+  <action name="Close" />
+</keybind>
+<keybind key="C-A-T">
+  <action name="Execute" command="lxterminal" />
+</keybind>
+</keyboard>
+</labwc_config>
+EOF
+
+if [ "${screenblank}" != "-1" ]; then
+    cat >${labwc_config}/autostart <<EOF
+swayidle -w \\
+  timeout ${screenblank} 'wlopm --off \*' \\
+  resume 'wlopm --on \*' \\
+  >/dev/null 2>&1 &
+EOF
+fi
 
 cat >runtill-script.sh <<EOF
 #!/bin/bash
+
+# Ensure quicktill doesn't try to invoke xset to unblank the display
+unset DISPLAY
 
 runtill \\
   -u $(jq -r .configurl config.json) \\
   -c $(jq -r '.configname // "default"' config.json) \\
   -t $(jq -r '.terminalname // .configname // "default"' config.json) \\
   -d "${database}" \\
+  $(jq -r 'if (.debug // false) != false then "--debug" else "" end' config.json) \\
   start \\
     --gtk \\
     --fullscreen \\
     $(jq -r 'if (.keyboard // false) != false then "--keyboard" else "" end' config.json) \\
     $(jq -r 'if (.keyboard // false) == "onscreen-only" then "--no-hardware-keyboard" else "" end' config.json) \\
+    $(jq -r 'if (.pointer // false) == false then "--hide-pointer" else "" end' config.json) \\
     --font="sans $(jq -r '.fontsize // 20' config.json)" \\
     --monospace-font="monospace $(jq -r '.fontsize // 20' config.json)" \\
     --pitch-adjust="$(jq -r '.pitchadjust // 0' config.json)" \\
@@ -61,15 +94,19 @@ case "\${tillexit}" in
   20) sudo poweroff ;;
   30) sudo reboot ;;
   40) ;;
-  *) echo "Till exit status was \${tillexit}" >>runtill.log
-     zenity --title="Till errors" --text-info --filename runtill.log ;;
+  *) echo "Till exit status was \${tillexit}" >>runtill.log ;;
 esac
+
+if [ -s runtill.log ]; then
+  zenity --title="Till output" --text-info --filename runtill.log \\
+    --width=1600 --height=800
+fi
+
 sleep 1
 
-# Attempt to kill wayfire
-python3 wayland-logout.py
+# labwc should exit after this script exits
 
 EOF
 chmod +x runtill-script.sh
 
-exec wayfire -c wayfire-till.ini
+exec labwc -C ${labwc_config} -S ./runtill-script.sh

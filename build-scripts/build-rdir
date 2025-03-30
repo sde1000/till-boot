@@ -22,7 +22,7 @@ case ${platform} in
 esac
 
 case ${distribution} in
-    bullseye|bookworm)
+    bullseye|bookworm|trixie)
 	true
 	;;
     *)
@@ -45,7 +45,6 @@ python3-reportlab
 python3-httplib2
 python3-qrcode
 python3-sqlalchemy
-python3-yaml
 quicktill-nfc-bridge
 oidentd
 usbutils
@@ -92,7 +91,9 @@ systemd-resolved
 libnss-systemd
 initramfs-tools
 busybox
-wayfire
+labwc
+swayidle
+wlopm
 wlr-randr
 lxterminal
 fonts-cantarell
@@ -103,6 +104,7 @@ fonts-liberation2
 fonts-quicksand
 fonts-symbola
 fonts-opensymbol
+fonts-noto-color-emoji
 xfonts-100dpi
 xfonts-75dpi
 xfonts-base
@@ -117,7 +119,7 @@ repoaddr=http://quicktill.assorted.org.uk/software
 repokey=keys/quicktill-repo.gpg.key
 
 # HTTP proxy to use as a cache; this should be configured to cache .deb files
-export http_proxy=http://sinister.sinister.greenend.org.uk:8000/
+export http_proxy=http://sinister.sinister.greenend.org.uk:3128/
 
 # Defaults
 function setup_pre_chroot { :; }
@@ -143,7 +145,7 @@ case ${platform} in
 		xserver=xserver-xorg
 		kernel=linux-generic-hwe-20.04
 		;;
-	    buster|bullseye|bookworm)
+	    buster|bullseye|bookworm|trixie)
 		upstream=debian
 		xserver=
 		case ${arch} in

@@ -1,37 +1,54 @@
 #!/bin/bash
 
-cat >wayfire-displayboard.ini <<EOF
-[core]
-plugins = animate autostart command fast-switcher grid idle move place switcher window-rules wm-actions
-plugins_nogl = animate autostart command fast-switcher grid idle move place switcher window-rules wm-actions
-xwayland = false
+echo
+echo "Starting display board..."
 
-[command]
-binding_terminal = <ctrl> <alt> KEY_T
-command_terminal = lxterminal
-binding_quit = <ctrl> <alt> KEY_DELETE
-command_quit = /usr/sbin/reboot
-binding_power = KEY_POWER
-command_power = /usr/sbin/poweroff
+# Ensure we start with a fresh labwc configuration directory
+labwc_config=mode-displayboard-labwc-config
+rm -rf ${labwc_config}
+mkdir ${labwc_config}
 
-[input]
-xkb_model = pc105
-xkb_layout = gb
-xkb_variant =
-
-[idle]
-screensaver_timeout = -1
-dpms_timeout = -1
-
-[autostart]
-autostart_wf_shell = false
-displayboard = /usr/bin/firefox --override /home/till/firefox-kiosk.ini --kiosk --private-window $(jq -r '."display-url" // "https://quicktill.assorted.org.uk/"' config.json)
-
+# XXX We should make the xkb settings configurable — allow them to be
+# set for the OS tty as well as the compositor!
+cat >${labwc_config}/environment <<EOF
+XKB_DEFAULT_LAYOUT=gb
 EOF
 
-cat >firefox-kiosk.ini <<EOF
-[XRE]
-EnableProfileMigrator=false
+cat >${labwc_config}/rc.xml <<EOF
+<?xml version="1.0"?>
+<labwc_config>
+<keyboard>
+<keybind key="A-Tab">
+  <action name="NextWindow" />
+</keybind>
+<keybind key="A-S-Tab">
+  <action name="PreviousWindow" />
+</keybind>
+<keybind key="A-F4">
+  <action name="Close" />
+</keybind>
+<keybind key="C-A-T">
+  <action name="Execute" command="lxterminal" />
+</keybind>
+</keyboard>
+</labwc_config>
 EOF
 
-exec wayfire -c wayfire-displayboard.ini
+cat >display-script.sh <<EOF
+#!/bin/bash
+
+./display-browser.py $(jq -r '."display-url" // "https://quicktill.assorted.org.uk/"' config.json) >display.log
+
+if [ -s display.log ]; then
+  zenity --title="Browser output" --text-info --filename display.log \\
+    --width=1600 --height=800
+fi
+
+sleep 1
+
+# labwc should exit after this script exits
+
+EOF
+chmod +x display-script.sh
+
+exec labwc -C ${labwc_config} -S ./display-script.sh

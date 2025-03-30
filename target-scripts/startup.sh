@@ -41,8 +41,10 @@ if jq -e 'has("extra-install")' config.json >/dev/null ; then
   sudo apt-get -y install $(jq -r '."extra-install" | join(" ")' config.json)
 fi
 
-exec ./mode-${mode}
+if [ -x ./mode-${mode} ]; then
+    exec ./mode-${mode}
+fi
 
-echo "Failed to run script for ${mode} mode — will retry in 30s"
+echo "Script for ${mode} mode is not executable — will retry in 30s"
 
 sleep 30
