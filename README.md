@@ -57,11 +57,8 @@ debian or raspberry pi os
 
 (But see bug list at end.)
 
-* pc bookworm {i386,amd64}
-* rpi bookworm {armhf,arm64}
-
-bullseye could be made to work again with additional scripts to choose
-between wayfire and X
+* pc trixie amd64 (using trixie in testing because labwc isn't in bookworm)
+* rpi bookworm arm64
 
 
 # How platforms boot
@@ -110,18 +107,3 @@ specified on the kernel command line in the `cmdline.txt` file. The
 squashfs image is loopback mounted, and an overlayfs is created to
 enable ramdisk-backed write to the image. The image is then started
 with the overlayfs as the root filesystem.
-
-# TODO / bugs for bookworm
-
-wayfire plugin to call seat::cursor::set_touchscreen_mode(true) on
-init?  (There's a "hide_cursor" plugin in wayfire-plugins-extra —
-maybe compile and package that and include it in the image? See
-https://github.com/seffs/wayfire-plugins-extra-raspbian )
-
-Fonts look a bit off — the baseline for the proportional font appears
-to be too high compared to the monospace font. This doesn't happen on
-bullseye. Entirely possible it's a bug in quicktill,
-though. Workaround: added a pitch adjustment command line parameter.
-
-Need a way for quicktill to unblank the screen on receiving a
-usertoken. Some way for it to speak Wayland idle protocol?
