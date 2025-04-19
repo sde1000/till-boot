@@ -31,10 +31,13 @@ cat >${labwc_config}/environment <<EOF
 XKB_DEFAULT_LAYOUT=gb
 EOF
 
+numlock_clause=$(jq -r 'if has("numlock") then "<numlock>" + if .numlock then "on" else "off" end + "</numlock>" else "" end' config.json)
+
 cat >${labwc_config}/rc.xml <<EOF
 <?xml version="1.0"?>
 <labwc_config>
 <keyboard>
+${numlock_clause}
 <keybind key="A-Tab">
   <action name="NextWindow" />
 </keybind>
