@@ -1,6 +1,6 @@
 # Start up till software automatically on tty1
 if [ "$(tty)" = "/dev/tty1" ]; then
-  if ! /usr/local/sbin/tillsetup ; then
+  if ! ./tillsetup.py ; then
     echo "Waiting 30s before rebooting to try again"
     sleep 30
     sudo reboot

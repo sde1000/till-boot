@@ -86,7 +86,7 @@ passwd -d till
 passwd -d root
 
 echo " --> copying setup script to /usr/local/sbin/"
-install -m 755 /root/scripts/tillsetup.py /usr/local/sbin/tillsetup
+install -m 755 -o till -g till /root/scripts/tillsetup.py /home/till/
 
 echo " --> adding mode scripts to till user's home directory"
 install -m 755 -o till -g till /root/scripts/mode-*[^~] /home/till/
