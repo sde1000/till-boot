@@ -103,9 +103,11 @@ repos = [
 
 [defaults-pc]
 architecture = "amd64"
+numlock = true
 
 [defaults-rpi]
 architecture = "arm64"
+numlock = false
 config-pi4 = [
   # "pi4-only option for config.txt",
 ]
