@@ -202,7 +202,7 @@ case ${platform} in
 		;;
 	esac
 	extrainstall_norecommends="${extrainstall_norecommends} ${kernel}"
-	extrainstall_recommends="${extrainstall_recommends} libraspberrypi-bin"
+	extrainstall_recommends="${extrainstall_recommends} raspi-utils-core"
 	function setup_pre_chroot {
 	    cat >>$target/etc/apt/sources.list <<EOF
 deb http://archive.raspberrypi.org/debian/ ${distribution} main
