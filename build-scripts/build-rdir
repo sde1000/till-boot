@@ -300,8 +300,8 @@ Acquire::http::Proxy "${http_proxy}";
 EOF
 fi
 
-# Override the default hostname
-echo till >$target/etc/hostname
+# Remove the default hostname so the till picks up its hostname from DHCP
+rm -f $target/etc/hostname
 
 # Tills repository to fetch till-related packages to be baked into the image
 cat >$target/etc/apt/sources.list.d/till-boot.list <<EOF
