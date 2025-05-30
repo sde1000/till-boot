@@ -203,7 +203,7 @@ case ${platform} in
 	extrainstall_norecommends="${extrainstall_norecommends} ${kernel}"
 	# sntp is no longer present in trixie — replaced by ntpsec-ntpdig;
 	# we will need to change once Raspberry moves to trixie
-	extrainstall_recommends="${extrainstall_recommends} raspi-utils-core sntp"
+	extrainstall_recommends="${extrainstall_recommends} raspi-utils-core sntp rpi-eeprom"
 	function setup_pre_chroot {
 	    cat >>$target/etc/apt/sources.list <<EOF
 deb http://archive.raspberrypi.org/debian/ ${distribution} main
