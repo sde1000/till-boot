@@ -9,6 +9,7 @@ import os.path
 import shutil
 import logging
 import datetime
+from collections import ChainMap
 
 try:
     import tomllib
@@ -18,8 +19,8 @@ except ModuleNotFoundError:
 log = logging.getLogger("till-boot-config")
 
 
-def path_or_fail(config, cmdline, name):
-    path = cmdline or config.get(name, None)
+def path_or_fail(config, name):
+    path = config.get(name, None)
     if not path:
         log.critical("%s not specified", name)
         sys.exit(1)
@@ -30,21 +31,264 @@ def path_or_none(path):
     return Path(path) if path else None
 
 
+class host:
+    """A configured host, set up by a driver
+    """
+    def __init__(self, name, settings):
+        self.name = name
+        self.settings = settings
+
+
+class _driver:
+    drivers = {}
+
+    def __init_subclass__(cls):
+        cls.drivers[getattr(cls, "driver_name", cls.__name__)] = cls
+
+    def __init__(self, name, config):
+        self.name = name
+        self.log = log.getChild(name)
+
+    def configure(self, name, settings, dry_run):
+        # Perform any local installation steps required for this host
+        # (copying files, etc.) and return a host instance
+        if "mac" not in settings:
+            self.log.warning(
+                "till %s: no 'mac' setting specified; this will become "
+                "a required setting in the future", name)
+
+        return host(name, settings)
+
+    def finish_installation(self, dry_run):
+        # Perform any local installation steps required by this driver
+        # (copying files, etc.)
+        pass
+
+
+class generic(_driver):
+    pass
+
+
+class till_boot(_driver):
+    driver_name = "till-boot"
+
+    def __init__(self, name, config):
+        super().__init__(name, config)
+        self.nfs_dir = path_or_fail(config, "nfs-dir")
+        self.tftp_dir = path_or_fail(config, "tftp-dir")
+        self.boot_dir = path_or_fail(config, "boot-dir")
+        self.http_dir = path_or_fail(config, "http-dir")
+        self.loaders_dir = path_or_none(config.get("loaders-dir"))
+
+        # Do we actually need any bootloaders? On a system with rpi
+        # 4+5 clients only, we don't!
+        self.loaders = []
+        if not self.loaders_dir:
+            self.loaders_dir = self.nfs_dir / 'loaders'
+        if self.loaders_dir.is_dir():
+            self.loaders = self.loaders_dir.glob("*")
+        else:
+            self.log.warning("loaders dir %s doesn't exist", self.loaders_dir)
+
+        self.default_append = config.get("default-append", [])
+
+        # Initial checks: nfs_dir, tftp_dir and http_dir must exist and be
+        # directories
+        if not self.nfs_dir.is_dir():
+            self.log.critical("nfs root dir %s doesn't exist", self.nfs_dir)
+            sys.exit(1)
+        if not self.tftp_dir.is_dir():
+            self.log.critical("tftp dir %s doesn't exist", self.tftp_dir)
+            sys.exit(1)
+        if not self.http_dir.is_dir():
+            self.log.critical("http dir %s doesn't exist", self.http_dir)
+            sys.exit(1)
+
+        if not self.nfs_dir.is_absolute():
+            self.log.warning("nfs dir %s is relative", self.nfs_dir)
+        if not self.tftp_dir.is_absolute():
+            self.log.warning("tftp dir %s is relative", self.tftp_dir)
+        if not self.http_dir.is_absolute():
+            self.log.warning("http dir %s is relative", self.http_dir)
+
+        if not self.boot_dir.is_dir():
+            self.log.critical("boot files directory %s doesn't exist",
+                              self.boot_dir)
+            sys.exit(1)
+
+        # Not currently used, but will be used in the future to generate a
+        # dhcpd config file fragment
+        self.tftp_server = config.get("tftp-server")
+        if not self.tftp_server:
+            self.log.critical("tftp-server is not specified")
+            sys.exit(1)
+
+        self.http_server = config.get("http-server")
+        if not self.http_server:
+            self.log.critical("http-server is not specified")
+            sys.exit(1)
+        if self.http_server[-1] != '/':
+            self.http_server = self.http_server + '/'
+
+        self.nfs_server = config.get("nfs-server")
+        if not self.nfs_server:
+            self.log.critical("nfs-server is not specified")
+            sys.exit(1)
+
+        # Find and store the platform defaults
+        self.platform_defaults = {
+            platform: config.get(f"defaults-{platform}", {})
+            for platform in _platform.platforms}
+
+        # Build a catalog of till boot files available on this machine
+        # (platform, arch, version) => platform class instance
+        self.catalog = {}
+        platform_dirs = self.nfs_dir.glob("*")
+        for platform_dir in platform_dirs:
+            if platform_dir == self.loaders_dir:
+                continue
+            if not platform_dir.is_dir():
+                continue
+            if platform_dir.name not in _platform.platforms:
+                self.log.warning("unknown platform %s in nfs dir",
+                                 platform_dir.name)
+                continue
+            for arch_dir in platform_dir.glob("*"):
+                if not arch_dir.is_dir():
+                    continue
+                for version_dir in arch_dir.glob("*"):
+                    if not version_dir.is_dir():
+                        continue
+                    platform = platform_dir.name
+                    arch = arch_dir.name
+                    version = version_dir.name
+                    bpath = self.boot_dir / platform / arch / version
+                    # Check that the image info file exists
+                    info_file = version_dir / "image-info.json"
+                    if not info_file.is_file():
+                        self.log.warning("%s is not a file", info_file)
+                        continue
+                    # Parse the info file
+                    with open(info_file) as f:
+                        info = json.load(f)
+                        # Check that platform and arch match
+                    if info.get('platform') != platform:
+                        self.log.warning(
+                            "platform in info file %s does not match path",
+                            info_file)
+                        continue
+                    if info.get('architecture') != arch:
+                        self.log.warning(
+                            "arch in info file %s does not match path",
+                            info_file)
+                        continue
+                    platform_class = _platform.platforms.get(platform)
+                    if not platform_class:
+                        self.log.warning("unsupported platform %s", platform)
+                        continue
+                    image = platform_class(
+                        self.log, info, version, version_dir, bpath,
+                        self.nfs_server, self.http_server)
+                    # Check the boot files are ok for the platform
+                    if not image.boot_files_ok():
+                        self.log.warning("missing boot files for %s", image)
+                        continue
+                    # Add to the catalog
+                    self.log.info(
+                        "available: %s %s %s", platform, arch, version)
+                    self.catalog[(platform, arch, version)] = image
+
+        # Build a dictionary of (platform, arch) -> latest version
+        self.latest = {}
+        for platform, arch, version in self.catalog.keys():
+            if version > self.latest.get((platform, arch), ""):
+                self.latest[(platform, arch)] = version
+
+    def configure(self, name, settings, dry_run):
+        platform = settings.get("platform")
+        if not platform:
+            self.log.error("till %s: no platform specified", name)
+            return
+
+        if platform not in self.platform_defaults:
+            self.log.error("till %s: platform %s does not exist",
+                           name, platform)
+            return
+
+        # settings is currently a ChainMap of till_settings, roles, defaults
+
+        # We want name, till_settings, roles, platform defaults, defaults
+        settings.maps.insert(-1, self.platform_defaults[platform])
+        settings.maps.insert(0, {'name': name})
+
+        arch = settings.get("architecture")
+        version = settings.get("version")
+        if isinstance(version, int):
+            version = str(version)
+            settings["version"] = version
+        if not arch or not version:
+            self.log.error("till %s: incomplete specification of arch/version",
+                           name)
+            return
+        using_latest = False
+        if version == "latest":
+            version = self.latest.get((platform, arch))
+            if not version:
+                self.log.error(
+                    "till %s: requested platform/arch %s not available",
+                    name, (platform, arch))
+                return
+            using_latest = True
+            settings["version"] = version
+
+        image = self.catalog.get((platform, arch, version))
+
+        if not image:
+            self.log.error(
+                "till %s: requested platform/arch/version %s "
+                "not available", name, (platform, arch, version))
+            return
+
+        missing_setting = image.check_settings(settings)
+        if missing_setting:
+            self.log.error("till %s: %s missing", name, missing_setting)
+            return
+
+        image.install(self.tftp_dir, self.http_dir, settings, using_latest,
+                      self.default_append, dry_run)
+
+        jf = self.http_dir / f"{name}.json"
+        if dry_run:
+            self.log.info("would write till %s settings to %s", name, jf)
+        else:
+            with jf.open('w') as f:
+                json.dump(dict(settings), f, indent=2)
+
+        return super().configure(name, settings, dry_run)
+
+    def finish_installation(self, dry_run=False):
+        # Make sure the loaders are copied into the tftp dir
+        for loader in self.loaders:
+            dest = self.tftp_dir / loader.name
+            if dry_run:
+                self.log.info("would install loader %s to %s", loader, dest)
+            else:
+                if dest.exists():
+                    dest.unlink()
+                shutil.copyfile(loader, dest)
+
+
 class _platform:
     required_settings = [
         "name",  # inserted automatically
-        "configurl",
-        "configname",
-        "dbname",
-        "dbhost",
-        "dbuser",
-        "install",
-        "fontsize",
-        "repos",
     ]
 
-    def __init__(self, info, version, mount_path, boot_path,
+    platforms = {}
+
+    def __init__(self, log, info, version, mount_path, boot_path,
                  nfs_server, http_server):
+        self.log = log.getChild(
+            f"{info['platform']}-{info['architecture']}-{version}")
         self.info = info
         self.version = version
         self.mount_path = mount_path
@@ -52,6 +296,9 @@ class _platform:
         self.architecture = info['architecture']
         self.nfs_server = nfs_server
         self.http_server = http_server
+
+    def __init_subclass__(cls):
+        cls.platforms[cls.__name__] = cls
 
     def boot_files_ok(self):
         return True
@@ -70,6 +317,10 @@ class _platform:
         for s in self.required_settings:
             if s not in settings:
                 return s
+
+    def install(self, tftp_dir, http_dir, settings, latest, default_append,
+                dry_run=False):
+        self.log.error("unexpected generic install!")
 
     def __str__(self):
         return f"{self.description}: {self.architecture} {self.version}"
@@ -105,7 +356,8 @@ class pc(_platform):
             return False
         return True
 
-    def install(self, tftp_dir, http_dir, settings, latest, default_append):
+    def install(self, tftp_dir, http_dir, settings, latest, default_append,
+                dry_run):
         till = settings['name']
 
         if latest:
@@ -118,8 +370,12 @@ class pc(_platform):
         # Copy the kernel and initrd into place if this has not
         # already been done
         if not self.installed:
-            shutil.copyfile(self.kernel, http_dir / kfile)
-            shutil.copyfile(self.initrd, http_dir / ifile)
+            if dry_run:
+                self.log.info("would install kernel to %s", http_dir / kfile)
+                self.log.info("would install initrd to %s", http_dir / ifile)
+            else:
+                shutil.copyfile(self.kernel, http_dir / kfile)
+                shutil.copyfile(self.initrd, http_dir / ifile)
             self.installed = True
 
         append = self.get_append(settings)
@@ -130,6 +386,10 @@ class pc(_platform):
         append += settings.get("append", [])
 
         cf = tftp_dir / f"{till}.ipxe"
+
+        if dry_run:
+            self.log.info("would write ipxe script for %s to %s", till, cf)
+            return
 
         with open(cf, 'w') as f:
             f.write("#!ipxe\n")
@@ -246,7 +506,8 @@ class rpi(_platform):
                 return False
         return True
 
-    def install(self, tftp_dir, http_dir, settings, latest, default_append):
+    def install(self, tftp_dir, http_dir, settings, latest, default_append,
+                dry_run):
         till = settings['name']
 
         if 'ntp-server' not in settings:
@@ -259,26 +520,50 @@ class rpi(_platform):
         override_firmware = path_or_none(settings.get("override-firmware"))
 
         # Copy the firmware and kernel into place
-        shutil.rmtree(serial_dir, ignore_errors=True)
+        if dry_run:
+            self.log.info("would rmtree %s", serial_dir)
+        else:
+            shutil.rmtree(serial_dir, ignore_errors=True)
         if override_firmware:
-            shutil.copytree(override_firmware, serial_dir)
+            if dry_run:
+                self.log.info("would copytree %s to %s",
+                              override_firmware, serial_dir)
+            else:
+                shutil.copytree(override_firmware, serial_dir)
             # Use the kernels and initrds from the image
             for kernel, initrd in self.initrds.items():
-                shutil.copy(self.bpath / kernel, serial_dir)
-                shutil.copy(initrd, serial_dir)
+                if dry_run:
+                    self.log.info("would copy %s to %s", self.bpath / kernel,
+                                  serial_dir)
+                    self.log.info("would copy %s to %s", initrd, serial_dir)
+                else:
+                    shutil.copy(self.bpath / kernel, serial_dir)
+                    shutil.copy(initrd, serial_dir)
         else:
-            shutil.copytree(self.bpath, serial_dir)
+            if dry_run:
+                self.log.info("would copytree %s to %s",
+                              self.bpath, serial_dir)
+            else:
+                shutil.copytree(self.bpath, serial_dir)
 
         # Kernel command line
         append = self.get_append(settings)
         append += default_append
         append += settings.get("append", [])
-        with open(serial_dir / "cmdline.txt", 'w') as f:
+        cmdline_file = serial_dir / "cmdline.txt"
+        if dry_run:
+            self.log.info("would write kernel command line to %s",
+                          cmdline_file)
+        with open(cmdline_file, 'w') as f:
             f.write(' '.join(append))
             f.write('\n')
 
         # Config file
-        with open(serial_dir / "config.txt", 'w') as f:
+        config_file = serial_dir / "config.txt"
+        if dry_run:
+            self.log.info("would write rpi config.txt to %s", config_file)
+            return
+        with open(config_file, 'w') as f:
             f.write(f"# This file was auto-generated by {sys.argv[0]} "
                     f"for {till}; do not edit\n")
             f.write(f"# Generated {datetime.datetime.now()}\n\n")
@@ -307,22 +592,10 @@ class rpi(_platform):
             f.write("\n# end\n\n")
 
 
-platforms = {
-    'pc': pc,
-    'rpi': rpi,
-}
-
-
 def run():
     parser = argparse.ArgumentParser("Set up networked boot for quicktill")
     parser.add_argument("--config-file", "-c", help="config file location",
                         default="/etc/till-boot/config.toml")
-    parser.add_argument("--nfs-dir", help="override nfs root location")
-    parser.add_argument("--tftp-dir", help="override tftp dir location")
-    parser.add_argument("--boot-dir",
-                        help="override kernel+initrd dir location")
-    parser.add_argument("--loaders-dir", help="override loaders loction")
-    parser.add_argument("--http-dir", help="override http dir location")
     parser.add_argument("--verbose", "-v", help="output more information "
                         "about operation", action="store_true")
     parser.add_argument("--dry-run", "-n",
@@ -341,185 +614,76 @@ def run():
     with open(args.config_file, "rb") as f:
         config = tomllib.load(f)
 
-    nfs_dir = path_or_fail(config, args.nfs_dir, "nfs-dir")
-    tftp_dir = path_or_fail(config, args.tftp_dir, "tftp-dir")
-    boot_dir = path_or_fail(config, args.boot_dir, "boot-dir")
-    http_dir = path_or_fail(config, args.http_dir, "http-dir")
-    loaders_dir = path_or_none(args.loaders_dir or config.get(
-        "loaders-dir"))
-    if not loaders_dir:
-        loaders_dir = nfs_dir / 'loaders'
-    if not loaders_dir.is_dir():
-        log.critical("loaders dir %s doesn't exist", loaders_dir)
-        sys.exit(1)
-
-    loaders = loaders_dir.glob("*")
-
-    default_append = config.get("default-append", [])
-
     defaults = config.get("defaults", {})
 
-    # Initial checks: nfs_dir, tftp_dir and http_dir must exist and be
-    # directories
-    if not nfs_dir.is_dir():
-        log.critical("nfs root dir %s doesn't exist", nfs_dir)
-        sys.exit(1)
-    if not tftp_dir.is_dir():
-        log.critical("tftp dir %s doesn't exist", tftp_dir)
-        sys.exit(1)
-    if not http_dir.is_dir():
-        log.critical("http dir %s doesn't exist", http_dir)
-        sys.exit(1)
+    # Process drivers; if no drivers configured, create one
+    # automatically and import the old-style configuration
+    driver_config = config.get("driver", {})
+    if driver_config:
+        drivers = {
+            name: _driver.drivers[config.get("class", name)](name, config)
+            for name, config in driver_config.items()}
+    else:
+        log.info("old-style configuration with no drivers found")
+        drivers = {"till-boot": till_boot("till-boot", config)}
+        defaults['driver'] = "till-boot"
 
-    if not nfs_dir.is_absolute():
-        log.warning("nfs dir %s is relative", nfs_dir)
-    if not tftp_dir.is_absolute():
-        log.warning("tftp dir %s is relative", tftp_dir)
-    if not http_dir.is_absolute():
-        log.warning("http dir %s is relative", http_dir)
+    roles = config.get("role", {})
 
-    if not boot_dir.is_dir():
-        log.critical("boot files directory %s doesn't exist", boot_dir)
-        sys.exit(1)
-
-    # Not currently used, but will be used in the future to generate a
-    # dhcpd config file fragment
-    tftp_server = config.get("tftp-server")
-    if not tftp_server:
-        log.critical("tftp-server is not specified")
-        sys.exit(1)
-
-    http_server = config.get("http-server")
-    if not http_server:
-        log.critical("http-server is not specified")
-        sys.exit(1)
-    if http_server[-1] != '/':
-        http_server = http_server + '/'
-
-    nfs_server = config.get("nfs-server")
-    if not nfs_server:
-        log.critical("nfs-server is not specified")
-        sys.exit(1)
-
-    # Build a catalog of till boot files available on this machine
-    # (platform, arch, version) => platform class instance
-    catalog = {}
-    platform_dirs = nfs_dir.glob("*")
-    for platform_dir in platform_dirs:
-        if platform_dir == loaders_dir:
-            continue
-        if not platform_dir.is_dir():
-            continue
-        if platform_dir.name not in platforms:
-            log.warning("unknown platform %s in nfs dir", platform_dir.name)
-            continue
-        for arch_dir in platform_dir.glob("*"):
-            if not arch_dir.is_dir():
-                continue
-            for version_dir in arch_dir.glob("*"):
-                if not version_dir.is_dir():
-                    continue
-                platform = platform_dir.name
-                arch = arch_dir.name
-                version = version_dir.name
-                bpath = boot_dir / platform / arch / version
-                # Check that the image info file exists
-                info_file = version_dir / "image-info.json"
-                if not info_file.is_file():
-                    log.warning("%s is not a file", info_file)
-                    continue
-                # Parse the info file
-                with open(info_file) as f:
-                    info = json.load(f)
-                # Check that platform and arch match
-                if info.get('platform') != platform:
-                    log.warning("platform in info file %s does not match path",
-                                info_file)
-                    continue
-                if info.get('architecture') != arch:
-                    log.warning("arch in info file %s does not match path",
-                                info_file)
-                    continue
-                platform_class = platforms.get(platform)
-                if not platform_class:
-                    log.warning("unsupported platform %s", platform)
-                    continue
-                image = platform_class(info, version, version_dir, bpath,
-                                       nfs_server, http_server)
-                # Check the boot files are ok for the platform
-                if not image.boot_files_ok():
-                    log.warning("missing boot files for %s", image)
-                    continue
-                # Add to the catalog
-                log.info("available: %s %s %s", platform, arch, version)
-                catalog[(platform, arch, version)] = image
-
-    # Build a dictionary of (platform, arch) -> latest version
-    latest = {}
-    for platform, arch, version in catalog.keys():
-        if version > latest.get((platform, arch), ""):
-            latest[(platform, arch)] = version
+    tills = {}
 
     # Process the configuration for each till
     for till, till_settings in config.get("tills", {}).items():
         log.info("Working on %s", till)
-        settings = defaults.copy()
-        settings.update(till_settings)
 
-        # We should now know the platform, and we can do this again
-        # including the platform defaults
-        platform = settings.get("platform")
-        if not platform:
-            log.error("till %s: no platform specified", till)
+        settings = ChainMap(till_settings, defaults)
+
+        # At this point we can look at "role" or "roles" to figure
+        # out a list of roles to load settings from, and start again
+        if "role" in settings and "roles" in settings:
+            log.error(
+                "till %s: you can't specify both 'role' and 'roles'", till)
+            continue
+        if "role" in settings:
+            role_names = [settings["role"]]
+        elif "roles" in settings:
+            role_names = settings["roles"]
+        else:
+            role_names = []
+
+        if any(not isinstance(role_name, str) for role_name in role_names):
+            log.error(
+                "till %s: role names must be strings", till)
+            continue
+        if any(role_name not in roles for role_name in role_names):
+            log.error(
+                "till %s: role does not exist", till)
             continue
 
-        settings = defaults.copy()
-        platform_defaults = config.get(f"defaults-{platform}")
-        if platform_defaults:
-            settings.update(platform_defaults)
-        settings.update(till_settings)
-        settings['name'] = till
+        role_settings = [roles[role_name]
+                         for role_name in reversed(role_names)]
 
-        arch = settings.get("architecture")
-        version = settings.get("version")
-        if isinstance(version, int):
-            version = str(version)
-            settings["version"] = version
-        if not arch or not version:
-            log.error("till %s: incomplete specification of arch/version",
-                      till)
+        settings = ChainMap(till_settings, *role_settings, defaults)
+
+        # Now we should know the driver to use for this till
+        driver_name = settings.get("driver")
+        if not driver_name:
+            log.error("till %s: driver not specified", till)
             continue
-        using_latest = False
-        if version == "latest":
-            version = latest.get((platform, arch))
-            using_latest = True
-            settings["version"] = version
-
-        image = catalog.get((platform, arch, version))
-
-        if not image:
-            log.error("till %s: requested platform/arch/version not available",
-                      till)
+        driver = drivers.get(driver_name)
+        if not driver:
+            log.error("till %s: driver %s does not exist", till, driver_name)
             continue
+        log.info("till %s: using driver %s", till, driver_name)
 
-        missing_setting = image.check_settings(settings)
-        if missing_setting:
-            log.error("till %s: %s missing", till, missing_setting)
-            continue
+        configured_host = driver.configure(till, settings, args.dry_run)
 
-        image.install(tftp_dir, http_dir, settings, using_latest,
-                      default_append)
+        if configured_host:
+            tills[till] = configured_host
 
-        jf = http_dir / f"{till}.json"
-        with jf.open('w') as f:
-            json.dump(settings, f, indent=2)
-
-    # Make sure the loaders are copied into the tftp dir
-    for loader in loaders:
-        dest = tftp_dir / loader.name
-        if dest.exists():
-            dest.unlink()
-        shutil.copyfile(loader, dest)
+    # Perform any driver-specific installation
+    for driver in drivers.values():
+        driver.finish_installation(args.dry_run)
 
 
 if __name__ == "__main__":

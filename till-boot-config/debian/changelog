@@ -1,3 +1,13 @@
+till-boot-config (17) stable; urgency=medium
+
+  * Add new "drivers" and "roles" configuration options
+
+  * Add compatibility code for older style configurations
+
+  * Warn if "mac" setting is not specified
+
+ -- Stephen Early <steve@assorted.org.uk>  Fri, 27 Jun 2025 15:09:50 +0100
+
 till-boot-config (16) stable; urgency=medium
 
   * Remove yaml support
