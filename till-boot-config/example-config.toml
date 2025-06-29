@@ -4,6 +4,32 @@
 # configures the drivers it uses and does not rely on the fallback
 # code in till-boot-config
 
+[network]
+# When a till client needs to communicate with the internet, its
+# traffic will be forwarded via this interface. Leave unset to
+# prevent till clients from communicating with the internet.
+upstream-interface = "enp1s0"
+
+# The interface that the till clients are attached to
+interface = "enp2s0"
+
+# The IPv4 network for the till clients; the host part is the
+# address the till server will have
+ipv4 = "172.31.172.1/24"
+
+network-file = "./10-tills.network"
+nftables-file = "./nftables.conf"
+kea-dhcp4-file = "./kea-dhcp4.conf"
+
+[[network.firewall-accept]]
+port = 5432  # postgresql
+network = "172.30.53.129/32"  # ur.i.individualpubs.co.uk
+
+#[[network.firewall-accept]]
+#port = 5432  # postgresql
+#network = "172.30.53.130/32"
+
+
 [driver.generic]
 # class = "generic"
 
@@ -18,7 +44,7 @@ tftp-dir = "/var/lib/tftpboot"
 
 # Location served over nfs: we read from this directory
 # We expect subdirectories to be named platform/arch/version and to
-# contain an image-info.yaml file
+# contain an image-info.json file
 # Versions are treated as integers; higher numbers are more recent
 nfs-dir = "/usr/share/till-boot"
 
@@ -35,13 +61,13 @@ boot-dir = "/var/lib/till-boot"
 http-dir = "/var/lib/tftpboot"
 
 # Address of TFTP server serving tftp-dir
-tftp-server = "192.168.73.30"  # IP address
+tftp-server = "172.31.172.1"  # IP address
 
 # Address of NFS server serving nfs-dir
-nfs-server= "192.168.73.30"  # IP address
+nfs-server= "172.31.172.1"  # IP address
 
 # URL of http server serving http-dir
-http-server = "http://192.168.73.30/till-boot/"
+http-server = "http://172.31.172.1/till-boot/"
 
 [driver.till-boot.defaults-pc]
 architecture = "amd64"
@@ -61,18 +87,18 @@ config = [
 driver = "till-boot"
 platform = "pc"
 version = "latest"
-configurl = "http://192.168.73.30/emfcamp.py"
+configurl = "http://172.31.172.1/emfcamp.py"
 configname = "default"
 dbname = "emfcamp"
-dbhost = "192.168.73.30"
-dbuser = "steve"
+dbhost = "172.31.172.1"
+dbuser = "till"
 install = [
-  "quicktill22",
+  "quicktill24",
 ]
 fontsize = "12"
 pointer = true
 repos = [
-   "deb [trusted=yes] http://192.168.73.30/software tills main",
+   "deb [trusted=yes] http://172.31.172.1/software tills main",
 ]
 
 [defaults]
@@ -96,7 +122,7 @@ configname = "mainbar"
 
 [tills.test-netboot-till]
 configname = "mainbar"
-architecture = "i386"
+#architecture = "i386"
 append = [
   "video=LVDS-1:d",
 ]
@@ -109,6 +135,7 @@ configname = "default"
 architecture = "amd64"
 fontsize = "16"
 pointer = false
+ipv4 = "172.31.172.3"
 
 [tills.test-till]
 configname = "stockterminal"
