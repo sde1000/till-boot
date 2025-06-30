@@ -9,15 +9,18 @@ from pathlib import Path
 import os.path
 import shutil
 import logging
+from logging import Logger
 import datetime
 import ipaddress
 from collections import ChainMap
+from typing import Tuple, List, Dict, Set
+from typing import NoReturn, Any, Optional, Iterable, Type
 import jinja2
 
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[no-redef]
 
 log = logging.getLogger("till-boot-config")
 
@@ -118,144 +121,155 @@ boot
 """)
 
 
-def fail():
+def fail() -> NoReturn:
     sys.exit(1)
 
 
-def path_or_fail(config, name):
-    path = config.get(name, None)
-    if not path:
+def dirpath_or_fail(log: Logger, config: Dict[str, Any], name: str) -> Path:
+    pathname = config.get(name, None)
+    if not pathname:
         log.critical("%s not specified", name)
         fail()
-    return Path(path)
+    path = Path(pathname)
+    if not path.exists():
+        log.critical("%s (%s) does not exist", name, path)
+        fail()
+    if not path.is_dir():
+        log.critical("%s is not a directory", name)
+        fail()
+    if not path.is_absolute():
+        log.warning("%s (%s) is relative", name, path)
+    return path
 
 
-def path_or_none(path):
+def path_or_none(path: Optional[str]) -> Optional[Path]:
     return Path(path) if path else None
 
 
 class FileOperation:
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         pass
 
 
 class DelTree(FileOperation):
-    def __init__(self, path):
+    def __init__(self, path: Path):
         self.path = path
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would rmtree %s", self.path)
         else:
             shutil.rmtree(self.path, ignore_errors=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"rmtree({self.path})"
 
 
 class UnlinkFileIfExists(FileOperation):
-    def __init__(self, path):
+    def __init__(self, path: Path):
         self.path = path
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would unlink %s if it exists", self.path)
         else:
             if self.path.exists():
                 self.path.unlink()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"unlink_file_if_exists({self.path})"
 
 
 class CopyTree(FileOperation):
-    def __init__(self, src, dest):
+    def __init__(self, src: Path, dest: Path):
         self.src = src
         self.dest = dest
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would copytree %s to %s", self.src, self.dest)
         else:
             shutil.copytree(self.src, self.dest)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"copytree({self.src}, {self.dest})"
 
 
 class CopyFile(FileOperation):
-    def __init__(self, src, dest):
+    def __init__(self, src: Path, dest: Path):
         self.src = src
         self.dest = dest
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would copy file %s to %s", self.src, self.dest)
         else:
             shutil.copyfile(self.src, self.dest)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"copyfile({self.src}, {self.dest})"
 
 
 class WriteJsonFile(FileOperation):
-    def __init__(self, contents, dest):
+    def __init__(self, contents: Dict[str, Any], dest: Path):
         self.contents = contents
         self.dest = dest
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would write json to file %s", self.dest)
         else:
             with self.dest.open('w') as f:
                 json.dump(self.contents, f, indent=2)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"write_json({self.dest})"
 
 
 class WriteTemplateFile(FileOperation):
-    def __init__(self, template, ctx, dest):
+    def __init__(self, template: jinja2.Template, ctx: Dict[str, Any],
+                 dest: Path):
         self.template = template
         self.ctx = ctx
         self.dest = dest
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would write template to file %s", self.dest)
         else:
             with self.dest.open('w') as f:
                 f.write(self.template.render(self.ctx))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"write_template({self.dest})"
 
 
 class WriteFile(FileOperation):
-    def __init__(self, contents, dest):
+    def __init__(self, contents: str, dest: Path):
         self.contents = contents
         self.dest = dest
 
-    def apply(self, log, dry_run):
+    def apply(self, log: Logger, dry_run: bool) -> None:
         if dry_run:
             log.info("would write file %s", self.dest)
         else:
             with self.dest.open('w') as f:
                 f.write(self.contents)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"write({self.dest})"
 
 
 class Host:
     """A configured host, set up by a driver
     """
-    def __init__(self, name, settings, network):
+    def __init__(self, name: str, settings: Dict[str, Any],
+                 network: Optional["Network"]):
         self.log = log.getChild(name)
         self.name = name
         self.settings = settings
         self.network = network
-        self.fileops = []
+        self.fileops: List[FileOperation] = []
 
         self.ipv4_address = None
         if "ipv4" in settings:
@@ -264,35 +278,37 @@ class Host:
             except ValueError as e:
                 log.critical("%s: ipv4: %s", name, e)
                 fail()
-            network.claim_ipv4(self.ipv4_address)
+            if network:
+                network.claim_ipv4(self.ipv4_address)
 
-    def add_fileops(self, fileops):
+    def add_fileops(self, fileops: Iterable[FileOperation]) -> None:
         self.fileops.extend(fileops)
 
-    def apply_fileops(self, dry_run):
+    def apply_fileops(self, dry_run: bool) -> None:
         for op in self.fileops:
             op.apply(self.log, dry_run)
 
 
 class _driver:
-    drivers = {}
+    drivers: Dict[str, Type["_driver"]] = {}
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         cls.drivers[getattr(cls, "driver_name", cls.__name__)] = cls
 
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: Dict[str, Any]):
         self.name = name
         self.log = log.getChild(name)
 
-    def configure(self, name, settings, network):
+    def configure(self, name: str, settings: ChainMap[str, Any],
+                  network: Optional["Network"]) -> Host:
         if "mac" not in settings:
             self.log.warning(
                 "till %s: no 'mac' setting specified; this will become "
                 "a required setting in the future", name)
 
-        return Host(name, settings, network)
+        return Host(name, dict(settings), network)
 
-    def fileops(self):
+    def fileops(self) -> Iterable[FileOperation]:
         # A list of file operations needed by the driver, independently
         # of any hosts
         return []
@@ -305,49 +321,25 @@ class generic(_driver):
 class till_boot(_driver):
     driver_name = "till-boot"
 
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: Dict[str, Any]):
         super().__init__(name, config)
-        self.nfs_dir = path_or_fail(config, "nfs-dir")
-        self.tftp_dir = path_or_fail(config, "tftp-dir")
-        self.boot_dir = path_or_fail(config, "boot-dir")
-        self.http_dir = path_or_fail(config, "http-dir")
+        self.nfs_dir = dirpath_or_fail(self.log, config, "nfs-dir")
+        self.tftp_dir = dirpath_or_fail(self.log, config, "tftp-dir")
+        self.boot_dir = dirpath_or_fail(self.log, config, "boot-dir")
+        self.http_dir = dirpath_or_fail(self.log, config, "http-dir")
         self.loaders_dir = path_or_none(config.get("loaders-dir"))
 
         # Do we actually need any bootloaders? On a system with rpi
         # 4+5 clients only, we don't!
-        self.loaders = []
+        self.loaders: List[Path] = []
         if not self.loaders_dir:
             self.loaders_dir = self.nfs_dir / 'loaders'
         if self.loaders_dir.is_dir():
-            self.loaders = self.loaders_dir.glob("*")
+            self.loaders = list(self.loaders_dir.glob("*"))
         else:
             self.log.warning("loaders dir %s doesn't exist", self.loaders_dir)
 
         self.default_append = config.get("default-append", [])
-
-        # Initial checks: nfs_dir, tftp_dir and http_dir must exist and be
-        # directories
-        if not self.nfs_dir.is_dir():
-            self.log.critical("nfs root dir %s doesn't exist", self.nfs_dir)
-            fail()
-        if not self.tftp_dir.is_dir():
-            self.log.critical("tftp dir %s doesn't exist", self.tftp_dir)
-            fail()
-        if not self.http_dir.is_dir():
-            self.log.critical("http dir %s doesn't exist", self.http_dir)
-            fail()
-
-        if not self.nfs_dir.is_absolute():
-            self.log.warning("nfs dir %s is relative", self.nfs_dir)
-        if not self.tftp_dir.is_absolute():
-            self.log.warning("tftp dir %s is relative", self.tftp_dir)
-        if not self.http_dir.is_absolute():
-            self.log.warning("http dir %s is relative", self.http_dir)
-
-        if not self.boot_dir.is_dir():
-            self.log.critical("boot files directory %s doesn't exist",
-                              self.boot_dir)
-            fail()
 
         # Not currently used, but will be used in the future to generate a
         # dhcpd config file fragment
@@ -432,21 +424,22 @@ class till_boot(_driver):
                     self.catalog[(platform, arch, version)] = image
 
         # Build a dictionary of (platform, arch) -> latest version
-        self.latest = {}
+        self.latest: Dict[Tuple[str, str], str] = {}
         for platform, arch, version in self.catalog.keys():
             if version > self.latest.get((platform, arch), ""):
                 self.latest[(platform, arch)] = version
 
-    def configure(self, name, settings, network):
+    def configure(self, name: str, settings: ChainMap[str, Any],
+                  network: Optional["Network"]) -> Host:
         platform = settings.get("platform")
         if not platform:
-            self.log.error("till %s: no platform specified", name)
-            return
+            self.log.critical("till %s: no platform specified", name)
+            fail()
 
         if platform not in self.platform_defaults:
-            self.log.error("till %s: platform %s does not exist",
-                           name, platform)
-            return
+            self.log.critical("till %s: platform %s does not exist",
+                              name, platform)
+            fail()
 
         # settings is currently a ChainMap of till_settings, roles, defaults
 
@@ -460,9 +453,10 @@ class till_boot(_driver):
             version = str(version)
             settings["version"] = version
         if not arch or not version:
-            self.log.error("till %s: incomplete specification of arch/version",
-                           name)
-            return
+            self.log.critical(
+                "till %s: incomplete specification of arch/version",
+                name)
+            fail()
         using_latest = False
         if version == "latest":
             version = self.latest.get((platform, arch))
@@ -477,19 +471,19 @@ class till_boot(_driver):
         image = self.catalog.get((platform, arch, version))
 
         if not image:
-            self.log.error(
+            self.log.critical(
                 "till %s: requested platform/arch/version %s "
                 "not available", name, (platform, arch, version))
-            return
+            fail()
 
-        missing_setting = image.check_settings(settings)
+        missing_setting = image.check_settings(dict(settings))
         if missing_setting:
             self.log.critical("till %s: %s missing", name, missing_setting)
             fail()
 
         host = super().configure(name, settings, network)
         host.add_fileops(image.install(
-            self.tftp_dir, self.http_dir, settings, using_latest,
+            self.tftp_dir, self.http_dir, dict(settings), using_latest,
             self.default_append))
 
         host.add_fileops([
@@ -497,7 +491,7 @@ class till_boot(_driver):
 
         return host
 
-    def fileops(self):
+    def fileops(self) -> Iterable[FileOperation]:
         # Make sure the loaders are copied into the tftp dir
         for loader in self.loaders:
             dest = self.tftp_dir / loader.name
@@ -506,14 +500,16 @@ class till_boot(_driver):
 
 
 class _platform:
+    description = "generic platform"
     required_settings = [
         "name",  # inserted automatically
     ]
 
-    platforms = {}
+    platforms: Dict[str, Type["_platform"]] = {}
 
-    def __init__(self, log, info, version, mount_path, boot_path,
-                 nfs_server, http_server):
+    def __init__(self, log: Logger, info: Dict[str, Any], version: str,
+                 mount_path: Path, boot_path: Path,
+                 nfs_server: str, http_server: str):
         self.log = log.getChild(
             f"{info['platform']}-{info['architecture']}-{version}")
         self.info = info
@@ -524,13 +520,13 @@ class _platform:
         self.nfs_server = nfs_server
         self.http_server = http_server
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         cls.platforms[cls.__name__] = cls
 
-    def boot_files_ok(self):
+    def boot_files_ok(self) -> bool:
         return True
 
-    def get_append(self, settings):
+    def get_append(self, settings: Dict[str, Any]) -> List[str]:
         append = list(self.info['append'])
         append += [
             "netboot=nfs",
@@ -540,25 +536,31 @@ class _platform:
         ]
         return append
 
-    def check_settings(self, settings):
+    def check_settings(self, settings: Dict[str, Any]) -> Optional[str]:
         for s in self.required_settings:
             if s not in settings:
                 return s
+        return None
 
-    def install(self, tftp_dir, http_dir, settings, latest, default_append):
+    def install(self, tftp_dir: Path, http_dir: Path,
+                settings: Dict[str, Any], latest: bool,
+                default_append: List[str]) -> Iterable[FileOperation]:
         yield from []
         self.log.critical("unexpected generic install!")
         fail()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.description}: {self.architecture} {self.version}"
 
 
 class pc(_platform):
     description = "PC"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, log: Logger, info: Dict[str, Any], version: str,
+                 mount_path: Path, boot_path: Path,
+                 nfs_server: str, http_server: str):
+        super().__init__(log, info, version, mount_path, boot_path,
+                         nfs_server, http_server)
         self.kernel = None
         self.initrd = None
         # Find our kernel and initrd files
@@ -575,17 +577,23 @@ class pc(_platform):
             log.warning("%s: possible_initrds %s", self, possible_initrds)
         self.installed = False
 
-    def boot_files_ok(self):
+    def boot_files_ok(self) -> bool:
         if not self.kernel or not self.kernel.is_file():
-            log.warning("%s: missing kernel", self)
+            self.log.warning("%s: missing kernel", self)
             return False
         if not self.initrd or not self.initrd.is_file():
-            log.warning("%s: missing initrd", self)
+            self.log.warning("%s: missing initrd", self)
             return False
         return True
 
-    def install(self, tftp_dir, http_dir, settings, latest, default_append):
+    def install(self, tftp_dir: Path, http_dir: Path,
+                settings: Dict[str, Any], latest: bool,
+                default_append: List[str]) -> Iterable[FileOperation]:
         till = settings['name']
+
+        if not self.kernel or not self.initrd:
+            self.log.critical("missing kernel or initrd at install time")
+            fail()
 
         if latest:
             kfile = f"vmlinuz-pc-{self.architecture}"
@@ -657,10 +665,13 @@ class rpi(_platform):
 
     required_settings = _platform.required_settings + ["serial"]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, log: Logger, info: Dict[str, Any], version: str,
+                 mount_path: Path, boot_path: Path,
+                 nfs_server: str, http_server: str):
+        super().__init__(log, info, version, mount_path, boot_path,
+                         nfs_server, http_server)
         self.bpath = self.boot_path / "boot"
-        self.initrds = {}  # kernel name -> initrd path
+        self.initrds: Dict[str, Path] = {}  # kernel name -> initrd path
         self.pre_bookworm = False
 
         # As of the "bookworm" release there is a new scheme for /boot
@@ -674,7 +685,7 @@ class rpi(_platform):
         else:
             self._init_pre_bookworm()
 
-    def _init_pre_bookworm(self):
+    def _init_pre_bookworm(self) -> None:
         self.pre_bookworm = True
         possible_initrds = list(self.bpath.glob("initrd.img-*"))
         prefix = os.path.commonprefix([x.name for x in possible_initrds])
@@ -692,7 +703,7 @@ class rpi(_platform):
             if initrd:
                 self.initrds[kernel_name] = initrd
 
-    def _init_bookworm(self):
+    def _init_bookworm(self) -> None:
         for kernel_name, initrd_name in self.initrd_names.items():
             kernel = self.bpath / kernel_name
             if not kernel.is_file():
@@ -702,13 +713,13 @@ class rpi(_platform):
                 continue
             self.initrds[kernel_name] = initrd
 
-    def get_append(self, settings):
+    def get_append(self, settings: Dict[str, Any]) -> List[str]:
         append = super().get_append(settings)
         if 'ntp-server' in settings:
             append.append(f"ntp-server={settings['ntp-server']}")
         return append
 
-    def boot_files_ok(self):
+    def boot_files_ok(self) -> bool:
         for f in self.required_boot_files:
             path = self.bpath / f
             if not path.is_file():
@@ -722,7 +733,9 @@ class rpi(_platform):
                 return False
         return True
 
-    def install(self, tftp_dir, http_dir, settings, latest, default_append):
+    def install(self, tftp_dir: Path, http_dir: Path,
+                settings: Dict[str, Any], latest: bool,
+                default_append: List[str]) -> Iterable[FileOperation]:
         till = settings['name']
 
         if 'ntp-server' not in settings:
@@ -785,7 +798,7 @@ class rpi(_platform):
 
 
 class Network:
-    def __init__(self, config):
+    def __init__(self, config: Dict[str, Any]):
         # Initially we're just going to support one network instance;
         # we may raise this limit in the future if more complicated
         # network topologies seem useful
@@ -825,12 +838,12 @@ class Network:
         self.ipv4_address = interface.ip
         self.ipv4_network = interface.network
 
-        self.ipv4_claimed = set()
+        self.ipv4_claimed: Set[ipaddress.IPv4Address] = set()
         self.claim_ipv4(self.ipv4_address)
 
         self._ipv4_iter = self.ipv4_network.hosts()
 
-    def claim_ipv4(self, address):
+    def claim_ipv4(self, address: ipaddress.IPv4Address) -> None:
         if not isinstance(address, ipaddress.IPv4Address):
             self.log.critical("address %s is not an IPv4Address")
             fail()
@@ -842,7 +855,7 @@ class Network:
             fail()
         self.ipv4_claimed.add(address)
 
-    def _allocate_ipv4(self):
+    def _allocate_ipv4(self) -> ipaddress.IPv4Address:
         try:
             while True:
                 i = next(self._ipv4_iter)
@@ -853,12 +866,12 @@ class Network:
             self.log.critical("no more ipv4 addresses left in tills network")
             fail()
 
-    def allocate_addresses(self, tills):
+    def allocate_addresses(self, tills: List[Host]) -> None:
         for till in tills:
             if not till.ipv4_address:
                 till.ipv4_address = self._allocate_ipv4()
 
-    def kea_dhcp4_config(self, tills):
+    def kea_dhcp4_config(self, tills: List[Host]) -> Dict[str, Any]:
         till_reservations = [
             {
                 "hw-address": till.settings['mac'],
@@ -1002,7 +1015,7 @@ class Network:
             "Dhcp4": dhcp4,
         }
 
-    def fileops(self, tills):
+    def fileops(self, tills: List[Host]) -> Iterable[FileOperation]:
         ctx = {
             'script_name': sys.argv[0],
             'interface': self.interface,
@@ -1025,7 +1038,7 @@ class Network:
                 self.kea_dhcp4_config(tills), self.kea_dhcp4_file)
 
 
-def run():
+def run() -> None:
     parser = argparse.ArgumentParser("Set up networked boot for quicktill")
     parser.add_argument("--config-file", "-c", help="config file location",
                         type=Path, default="/etc/till-boot/config.toml")

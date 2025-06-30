@@ -17,9 +17,9 @@ interface = "enp2s0"
 # address the till server will have
 ipv4 = "172.31.172.1/24"
 
-network-file = "./10-tills.network"
-nftables-file = "./nftables.conf"
-kea-dhcp4-file = "./kea-dhcp4.conf"
+network-file = "/etc/systemd/network/10-tills.network"
+nftables-file = "/etc/nftables.conf"
+kea-dhcp4-file = "/etc/kea/kea-dhcp4.conf"
 
 [[network.firewall-accept]]
 port = 5432  # postgresql
