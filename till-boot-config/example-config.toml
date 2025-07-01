@@ -5,6 +5,10 @@
 # code in till-boot-config
 
 [network]
+# This section controls the generation of network configuration
+# files. If you do not need till-boot-config to generate these files,
+# you can omit this section.
+
 # When a till client needs to communicate with the internet, its
 # traffic will be forwarded via this interface. Leave unset to
 # prevent till clients from communicating with the internet.
@@ -17,25 +21,42 @@ interface = "enp2s0"
 # address the till server will have
 ipv4 = "172.31.172.1/24"
 
+# Where to write the systemd-networkd configuration file for the tills
+# network
 network-file = "/etc/systemd/network/10-tills.network"
+
+# Where to write the nftables configuration file that controls
+# firewalling and forwarding/masquerading from the tills network to
+# the upstream network
 nftables-file = "/etc/nftables.conf"
+
+# Where to write the Kea DHCP server configuration file. It will
+# contain a reservation for every till that has a "mac" configuration
+# setting.
 kea-dhcp4-file = "/etc/kea/kea-dhcp4.conf"
 
-[[network.firewall-accept]]
-port = 5432  # postgresql
-network = "172.30.53.129/32"  # ur.i.individualpubs.co.uk
+# Additional TCP ports can be opened in the firewall by adding
+# [[network.firewall-accept]] sections here
 
-#[[network.firewall-accept]]
-#port = 5432  # postgresql
-#network = "172.30.53.130/32"
+# [[network.firewall-accept]]
+# port = 5432  # postgresql
+# network = "172.30.53.129/32"  # ur.i.individualpubs.co.uk
 
 
+# An example driver that does not write any configuration files. It
+# can be used to reserve IP addresses on the tills network for things
+# that are not till clients.
 [driver.generic]
+# By default, the class used for a driver will match the driver's
+# name. You only need to specify class explicitly if you are creating
+# a driver with a different name from the class.
+
 # class = "generic"
 
 [driver.generic.defaults]
 hello = "world"
 
+# The driver that writes till configuration and boot files.
 [driver.till-boot]
 # class = "till-boot"
 
@@ -45,7 +66,6 @@ tftp-dir = "/var/lib/tftpboot"
 # Location served over nfs: we read from this directory
 # We expect subdirectories to be named platform/arch/version and to
 # contain an image-info.json file
-# Versions are treated as integers; higher numbers are more recent
 nfs-dir = "/usr/share/till-boot"
 
 # Bootloaders: all files here are copied to tftp-dir
@@ -83,6 +103,7 @@ config = [
   # "general option for config.txt",
 ]
 
+# A role is a named set of defaults
 [role.till]
 driver = "till-boot"
 platform = "pc"
@@ -96,7 +117,7 @@ install = [
   "quicktill24",
 ]
 fontsize = "12"
-pointer = true
+pointer = false
 repos = [
    "deb [trusted=yes] http://172.31.172.1/software tills main",
 ]
@@ -110,9 +131,9 @@ role = "till"
 [tills.test-generic]
 driver = "generic"
 foo = "bar"
+ipv4 = "172.31.172.23"
 
 [tills.test-till-vm]
-#architecture = "i386"
 configname = "mainbar"
 keyboard = true
 
@@ -122,7 +143,6 @@ configname = "mainbar"
 
 [tills.test-netboot-till]
 configname = "mainbar"
-#architecture = "i386"
 append = [
   "video=LVDS-1:d",
 ]
