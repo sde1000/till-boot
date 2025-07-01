@@ -1,3 +1,9 @@
+till-boot-config (18) stable; urgency=medium
+
+  * Add ability to generate network configuration files
+
+ -- Stephen Early <steve@assorted.org.uk>  Tue, 1 Jul 2025 21:13:55 +0100
+
 till-boot-config (17) stable; urgency=medium
 
   * Add new "drivers" and "roles" configuration options
