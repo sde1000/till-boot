@@ -1,3 +1,11 @@
+till-boot-config (19) stable; urgency=medium
+
+  * Fix ip-address in reservations in generated kea configuration file
+
+  * Re-enable http boot in ipxe
+
+ -- Stephen Early <steve@assorted.org.uk>  Wed, 2 Jul 2025 18:34:34 +0100
+
 till-boot-config (18) stable; urgency=medium
 
   * Add ability to generate network configuration files
