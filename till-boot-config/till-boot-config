@@ -133,12 +133,19 @@ def fail() -> NoReturn:
     sys.exit(1)
 
 
-def dirpath_or_fail(log: Logger, config: Dict[str, Any], name: str) -> Path:
-    pathname = config.get(name, None)
-    if not pathname:
+def string_or_fail(log: Logger, config: Dict[str, Any], name: str) -> str:
+    if name not in config:
         log.critical("%s not specified", name)
         fail()
-    path = Path(pathname)
+    val = config[name]
+    if not isinstance(val, str):
+        log.critical("%s must be a string", name)
+        fail()
+    return val
+
+
+def dirpath_or_fail(log: Logger, config: Dict[str, Any], name: str) -> Path:
+    path = Path(string_or_fail(log, config, name))
     if not path.exists():
         log.critical("%s (%s) does not exist", name, path)
         fail()
@@ -298,15 +305,17 @@ class _driver:
     def __init_subclass__(cls) -> None:
         cls.drivers[getattr(cls, "driver_name", cls.__name__)] = cls
 
-    def __init__(self, name: str, config: Dict[str, Any]):
+    def __init__(self, name: str, config: Dict[str, Any],
+                 network: Optional["Network"]):
         self.name = name
+        self.network = network
         self.log = log.getChild(name)
 
     def configure(self, name: str, settings: ChainMap[str, Any]) -> Host:
         if "mac" not in settings:
             self.log.warning(
-                "till %s: no 'mac' setting specified; this will become "
-                "a required setting in the future", name)
+                "till %s: no 'mac' setting specified; till will not "
+                "be included in DHCP server configuration", name)
 
         return Host(name, dict(settings))
 
@@ -323,8 +332,9 @@ class generic(_driver):
 class till_boot(_driver):
     driver_name = "till-boot"
 
-    def __init__(self, name: str, config: Dict[str, Any]):
-        super().__init__(name, config)
+    def __init__(self, name: str, config: Dict[str, Any],
+                 network: Optional["Network"]):
+        super().__init__(name, config, network)
         self.nfs_dir = dirpath_or_fail(self.log, config, "nfs-dir")
         self.tftp_dir = dirpath_or_fail(self.log, config, "tftp-dir")
         self.boot_dir = dirpath_or_fail(self.log, config, "boot-dir")
@@ -343,24 +353,27 @@ class till_boot(_driver):
 
         self.default_append = config.get("default-append", [])
 
-        # Not currently used, but will be used in the future to generate a
-        # dhcpd config file fragment
-        self.tftp_server = config.get("tftp-server")
-        if not self.tftp_server:
-            self.log.critical("tftp-server is not specified")
-            fail()
+        # If network configuration is present, fetch tftp+nfs+http server
+        # settings from there, and warn if they are still present in the
+        # driver configuration
+        if self.network:
+            self.tftp_server = str(self.network.tftp_server)
+            self.http_server = self.network.http_server
+            self.nfs_server = str(self.network.nfs_server)
 
-        self.http_server = config.get("http-server")
-        if not self.http_server:
-            self.log.critical("http-server is not specified")
-            fail()
-        if self.http_server[-1] != '/':
-            self.http_server = self.http_server + '/'
+            if "tftp-server" in config or "http-server" in config \
+               or "nfs-server" in config:
+                self.log.warning(
+                    "the tftp-server, http-server and nfs-server settings "
+                    "are redundant when a network configuration section is "
+                    "present, and should be removed")
 
-        self.nfs_server = config.get("nfs-server")
-        if not self.nfs_server:
-            self.log.critical("nfs-server is not specified")
-            fail()
+        else:
+            self.tftp_server = string_or_fail(self.log, config, "tftp-server")
+            self.http_server = string_or_fail(self.log, config, "http-server")
+            if self.http_server[-1] != '/':
+                self.http_server = self.http_server + '/'
+            self.nfs_server = string_or_fail(self.log, config, "nfs-server")
 
         # Find and store the platform defaults
         self.platform_defaults = {
@@ -860,6 +873,11 @@ class Network:
 
         self._ipv4_iter = self.ipv4_network.hosts()
 
+        # These attributes can be read by drivers using this network
+        self.tftp_server = self.ipv4_address
+        self.nfs_server = self.ipv4_address
+        self.http_server = f"http://{self.ipv4_address}/till-boot/"
+
     def claim_ipv4(self, address: ipaddress.IPv4Address) -> None:
         if not isinstance(address, ipaddress.IPv4Address):
             self.log.critical("address %s is not an IPv4Address")
@@ -959,7 +977,7 @@ class Network:
                 {
                     "name": "ipxe",
                     "test": "option[77].hex == 'iPXE'",
-                    "boot-file-name": "init.ipxe",
+                    "boot-file-name": f"{self.http_server}init.ipxe",
                 },
                 {
                     "name": "pxe-legacy",
@@ -1095,11 +1113,12 @@ def run() -> None:
     driver_config = config.get("driver", {})
     if driver_config:
         drivers = {
-            name: _driver.drivers[config.get("class", name)](name, config)
+            name: _driver.drivers[config.get("class", name)](
+                name, config, network)
             for name, config in driver_config.items()}
     else:
         log.info("old-style configuration with no drivers found")
-        drivers = {"till-boot": till_boot("till-boot", config)}
+        drivers = {"till-boot": till_boot("till-boot", config, network)}
         defaults['driver'] = "till-boot"
 
     roles = config.get("role", {})

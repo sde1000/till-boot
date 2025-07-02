@@ -80,15 +80,6 @@ boot-dir = "/var/lib/till-boot"
 # Permitted to be the same as tftp-dir
 http-dir = "/var/lib/tftpboot"
 
-# Address of TFTP server serving tftp-dir
-tftp-server = "172.31.172.1"  # IP address
-
-# Address of NFS server serving nfs-dir
-nfs-server= "172.31.172.1"  # IP address
-
-# URL of http server serving http-dir
-http-server = "http://172.31.172.1/till-boot/"
-
 [driver.till-boot.defaults-pc]
 architecture = "amd64"
 numlock = true
