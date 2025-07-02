@@ -892,10 +892,10 @@ class Network:
                     self.log.critical("%s: ipv4: %s", till.name, e)
                     fail()
                 self.claim_ipv4(ipv4_address)
+                till.kea_reservation["ip-address"] = str(ipv4_address)
         for till in tills:
             if "ipv4" not in till.settings:
-                ipv4_address = self._allocate_ipv4()
-            till.kea_reservation["ip-address"] = str(ipv4_address)
+                till.kea_reservation["ip-address"] = str(self._allocate_ipv4())
 
     def kea_dhcp4_config(self, tills: List[Host]) -> Dict[str, Any]:
         till_reservations = [
