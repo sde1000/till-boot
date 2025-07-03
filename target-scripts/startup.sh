@@ -41,6 +41,11 @@ if jq -e 'has("extra-install")' config.json >/dev/null ; then
   sudo apt-get -y install $(jq -r '."extra-install" | join(" ")' config.json)
 fi
 
+if jq -e 'has("quicktill-config")' config.json >/dev/null ; then
+    mkdir -p ~/.config
+    jq '."quicktill-config"' config.json >~/.config/quicktill.json
+fi
+
 if [ -x ./mode-${mode} ]; then
     exec ./mode-${mode}
 fi

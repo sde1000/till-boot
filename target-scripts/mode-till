@@ -3,15 +3,21 @@
 echo
 echo "Starting till..."
 
-database=$(jq -r '{dbname: .dbname, host: .dbhost, user: .dbuser, password: .dbpassword} | to_entries | map(select(.value != null)) | map(.key+"="+.value) | join(" ")' config.json)
+if jq -e 'has("quicktill-config") | not' config.json >/dev/null ; then
+    echo
+    echo "Warning: using legacy till-boot-config options configurl, dbname, dbhost, dbuser, dbpassword"
+    echo "Replace these with a quicktill-config option instead"
+    echo
+    sleep 5
+    database=$(jq -r '{dbname: .dbname, host: .dbhost, user: .dbuser, password: .dbpassword} | to_entries | map(select(.value != null)) | map(.key+"="+.value) | join(" ")' config.json)
+    legacy_options="-d \"${database}\" -u $(jq -r .configurl config.json)"
+fi
 
 # Default screen blanking to "off" if not configured
 screenblank=$(jq '."screen-blank-timeout" // -1' config.json)
 
 if [ $(jq '.debug // false' config.json) != "false" ]; then
     echo "Debug mode"
-    echo "Database: ${database}"
-    echo "Screen blank: ${screenblank}"
     sleep 2
 fi
 
@@ -70,10 +76,9 @@ cat >runtill-script.sh <<EOF
 unset DISPLAY
 
 runtill \\
-  -u $(jq -r .configurl config.json) \\
-  -c $(jq -r '.configname // "default"' config.json) \\
-  -t $(jq -r '.terminalname // .configname // "default"' config.json) \\
-  -d "${database}" \\
+  $(jq -r 'if has("configname") then "-c " + .configname else "" end' config.json) \\
+  $(jq -r 'if has("terminalname") then "-t " + .terminalname else "" end' config.json) \\
+  ${legacy_options} \\
   $(jq -r 'if (.debug // false) != false then "--debug" else "" end' config.json) \\
   start \\
     --gtk \\
