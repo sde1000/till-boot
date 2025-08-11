@@ -1027,6 +1027,11 @@ class Network:
             "subnet4": [
                 {
                     "subnet": str(self.ipv4_network),
+                    # Kea requires a unique stable identifier per
+                    # subnet, to associate clients' leases with their
+                    # respective subnets. Since we are only ever
+                    # defining one subnet, we just specify a constant.
+                    "id": 100,
                     "next-server": str(self.ipv4_address),  # XXX per-host?
                     "match-client-id": False,
                     "option-data": [

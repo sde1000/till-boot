@@ -1,3 +1,9 @@
+till-boot-config (20) stable; urgency=medium
+
+  * Specify a subnet id in generated kea configuration file
+
+ -- Stephen Early <steve@assorted.org.uk>  Mon, 11 Aug 2025 18:40:03 +0100
+
 till-boot-config (19) stable; urgency=medium
 
   * Fix ip-address in reservations in generated kea configuration file
