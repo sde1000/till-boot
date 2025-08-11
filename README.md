@@ -55,10 +55,9 @@ debian or raspberry pi os
 
 ## Currently working
 
-(But see bug list at end.)
-
-* pc trixie amd64 (using trixie in testing because labwc isn't in bookworm)
+* pc trixie amd64
 * rpi bookworm arm64
+* rpi trixie arm64
 
 
 # How platforms boot

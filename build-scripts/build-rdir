@@ -113,6 +113,8 @@ xfonts-scalable
 zenity
 plymouth
 plymouth-themes
+sudo
+ntpsec-ntpdig
 EOF
 		       )
 
@@ -174,7 +176,7 @@ case ${platform} in
 	;;
     rpi)
 	case ${distribution} in
-	    bookworm)
+	    bookworm|trixie)
 		case ${arch} in
 		    armhf)
 			kernel="raspi-firmware linux-image-rpi-v6 linux-image-rpi-v7 linux-image-rpi-v7l linux-image-rpi-v8"
@@ -201,9 +203,7 @@ case ${platform} in
 		;;
 	esac
 	extrainstall_norecommends="${extrainstall_norecommends} ${kernel}"
-	# sntp is no longer present in trixie — replaced by ntpsec-ntpdig;
-	# we will need to change once Raspberry moves to trixie
-	extrainstall_recommends="${extrainstall_recommends} raspi-utils-core sntp rpi-eeprom"
+	extrainstall_recommends="${extrainstall_recommends} raspi-utils-core rpi-eeprom"
 	function setup_pre_chroot {
 	    cat >>$target/etc/apt/sources.list <<EOF
 deb http://archive.raspberrypi.org/debian/ ${distribution} main
@@ -219,20 +219,7 @@ EOF
 esac
 
 case ${upstream} in
-    ubuntu)
-	source=http://gb.archive.ubuntu.com/ubuntu/
-	debootstrap_keyring=
-	boot=live
-	function setup_apt_sources {
-	    cat >$target/etc/apt/sources.list <<EOF
-deb http://gb.archive.ubuntu.com/ubuntu $distribution main restricted universe multiverse
-deb http://gb.archive.ubuntu.com/ubuntu $distribution-updates main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu $distribution-security main restricted universe multiverse
-EOF
-	}
-	;;
     debian)
-	extrainstall_recommends="${extrainstall_recommends} sudo"
 	source=http://deb.debian.org/debian/
 	debootstrap_keyring=
 	boot=live
@@ -258,7 +245,6 @@ EOF
 	}
 	;;
     raspbian)
-	extrainstall_recommends="${extrainstall_recommends} sudo"
 	source=http://raspbian.raspberrypi.org/raspbian/
 	boot=live
 	echo Creating debootstrap keyring using raspbian.public.key
@@ -380,26 +366,8 @@ rm -f $target/var/lib/dbus/machine-id $target/etc/machine-id
 # Tell build-deb where to put the squashfs
 echo ${boot} >${target}.boot
 
-# XXX Are the manifest and diskdefines necessary?  Does casper
-# complain if they are missing?
-
 # Build the manifest file
 chroot $target dpkg-query -W --showformat='${Package} ${Version}\n' >${manifest}
-
-if [ "${boot}" = "casper" ]; then
-  # Diskdefines
-  cat >${diskdefines} <<EOF
-#define DISKNAME  quicktill
-#define TYPE  binary
-#define TYPEbinary  1
-#define ARCH  ${arch}
-#define ARCH${arch}  1
-#define DISKNUM  1
-#define DISKNUM1  1
-#define TOTALNUM  0
-#define TOTALNUM0  1
-EOF
-fi
 
 # Image info file
 cat >${imginfo} <<EOF
@@ -425,21 +393,7 @@ if [ "${platform}" = "rpi" ]; then
     # kernels have a non-standard default which prevents many
     # touchscreens working
 
-    if [ "${distribution}" != "bookworm" ]; then
-	cat >>${imginfo} <<EOF
- - console=tty1
- - net.ifnames=0
- - ethdevice-timeout=30
- - usbhid.mousepoll=0
-config-pi4:
- - dtoverlay=vc4-fkms-v3d
- - max_framebuffers=2
-config:
- - dtoverlay=audio=on
- - disable_overscan=1
-EOF
-    else
-	cat >>${imginfo} <<EOF
+    cat >>${imginfo} <<EOF
  - console=tty1
  - net.ifnames=0
  - ethdevice-timeout=30
@@ -454,7 +408,6 @@ config:
  - disable_fw_kms_setup=1
  - disable_overscan=1
 EOF
-    fi
     if [ "${arch}" = "arm64" ]; then
 	cat >>${imginfo} <<EOF
  - arm_64bit=1
@@ -464,3 +417,6 @@ fi
 
 # Image info file, JSON version
 ./build-scripts/yaml2json.py <${imginfo} >${imginfo_json}
+
+# Remove the yaml version, nothing depends on it any more
+rm ${imginfo}

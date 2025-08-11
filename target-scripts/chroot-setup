@@ -106,10 +106,10 @@ ExecStart=-/sbin/agetty --8bits --noissue --skip-login --login-program /usr/loca
 EOF
 
 echo " --> installing extra requested packages without recommendations"
-apt-get -q -y --no-install-recommends install $(cat /root/extrainstall_norecommends)
+apt-get -q -y --no-install-recommends install $(cat /root/extrainstall_norecommends) || exit 1
 
 echo " --> installing extra requested packages with recommendations"
-apt-get -q -y install $(cat /root/extrainstall_recommends)
+apt-get -q -y install $(cat /root/extrainstall_recommends) || exit 1
 
 echo " --> configuring plymouth"
 plymouth-set-default-theme spinner
@@ -151,42 +151,19 @@ echo blacklist vga16fb >>/etc/initramfs-tools/modules
 cp /root/scripts/initramfs-live.hook /etc/initramfs-tools/hooks/live
 cp /root/scripts/initramfs-live.script /etc/initramfs-tools/scripts/live
 
-if [ "${platform}" = "rpi" ]; then
-    echo " --> setting up initramfs for sntp"
-    # Raspberries don't have a non-volatile clock, so we support
-    # setting the time with sntp in the initramfs just before we pivot
-    # to the overlayfs root and start systemd
-    cp /root/scripts/initramfs-sntp.script /etc/initramfs-tools/scripts/init-bottom/sntp
+if [ -x "/usr/bin/ntpdig" ]; then
+    echo " --> setting up initramfs for ntpdig"
+    cp /root/scripts/initramfs-ntpdig.script /etc/initramfs-tools/scripts/init-bottom/ntpdig
 fi
 
-# Raspberry pre-bookworm has a non-standard procedure for regenerating
-# initrds
+# This enables some services to delay their startup until after the
+# clock is synchronized. It doesn't delay startup of (eg.) getty etc.
+echo " --> enabling systemd-time-wait-sync.service"
+systemctl enable systemd-time-wait-sync.service
 
-if [ "${platform}" = "rpi" -a "${VERSION_CODENAME}" != "bookworm" ]; then
-    echo " --> configuring raspberry kernel for initrd"
-
-    # The kernel is already installed, but we need to reconfigure
-    # the package to generate the initrds...
-    cat >/etc/default/raspberrypi-kernel <<EOF
-# Defaults for raspberrypi-kernel
-
-# Uncomment the following line to enable generation of
-# /boot/initrd.img-KVER files (requires initramfs-tools)
-
-INITRD=Yes
-
-# Uncomment the following line to enable generation of
-# /boot/initrd(7).img files (requires rpi-initramfs-tools)
-
-#RPI_INITRD=Yes
-
-EOF
-    dpkg-reconfigure raspberrypi-kernel
-else
-    echo " --> updating initramfs"
-    update-initramfs -k all -d
-    update-initramfs -k all -c
-fi
+echo " --> updating initramfs"
+update-initramfs -k all -d
+update-initramfs -k all -c
 
 echo " --> cleaning up package caches"
 # Clean up package caches

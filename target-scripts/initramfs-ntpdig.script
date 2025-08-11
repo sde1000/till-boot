@@ -23,5 +23,5 @@ for x in $(cat /proc/cmdline); do
 done
 
 if [ -n "${NTPSERVER}" ]; then
-    chroot /root /usr/bin/sntp -Ss -M 128 ${NTPSERVER}
+    chroot /root /usr/bin/ntpdig -Ss -M 128 ${NTPSERVER}
 fi
