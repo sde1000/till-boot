@@ -42,6 +42,8 @@ Description=Tills network
 DHCP=no
 Address={{ipv4_interface}}
 {% if upstream_interface -%}
+# IPForward is ineffective from systemd-256; set IPv4Fowarding=yes in
+# /etc/systemd/networkd.conf [Network] section instead
 IPForward=ipv4
 {% endif -%}
 IPv6AcceptRA=false
