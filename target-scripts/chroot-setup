@@ -120,8 +120,41 @@ SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0e03", SYMLINK
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0e15", SYMLINK+="epson-tm-t20ii"
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="0202", SYMLINK+="epson-tm-u220"
 SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a700", SYMLINK+="aures-odp-333"
-SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="0922", ATTRS{idProduct}=="0020", SYMLINK+="dymo-labelwriter-450"
 EOF
+
+echo " --> setting up udev and systemd for remote access to label printers"
+while read vend prod name port desc; do
+    cat >>/etc/udev/rules.d/60-label-printers.rules <<EOF
+SUBSYSTEM=="usbmisc", ATTRS{idVendor}=="${vend}", ATTRS{idProduct}=="${prod}", SYMLINK+="${name}" TAG+="systemd" ENV{SYSTEMD_WANTS}+="${name}.socket"
+EOF
+    cat >/etc/systemd/system/${name}.socket <<EOF
+[Unit]
+Description=${desc}
+BindsTo=dev-$(systemd-escape ${name}).device
+
+[Socket]
+ListenStream=${port}
+Accept=yes
+MaxConnections=1
+EOF
+    cat >/etc/systemd/system/${name}@.service <<EOF
+[Unit]
+Description=${desc}
+CollectMode=inactive-or-failed
+
+[Service]
+StandardInput=socket
+StandardOutput=socket
+DynamicUser=yes
+Group=lp
+ExecStart=/bin/bash -c "cat >/dev/${name}"
+EOF
+done <<EOF
+0922 001f dymo-labelwriter-4xl 9005 Dymo LabelWriter 4XL label printer
+0922 0020 dymo-labelwriter-450 9010 Dymo LabelWriter 450 label printer
+04f9 2042 brother-ql-700       9020 Brother QL-700 label printer
+EOF
+
 
 LIBCCID_CONFIG=/etc/libccid_Info.plist
 if [ -f ${LIBCCID_CONFIG} ] ; then
