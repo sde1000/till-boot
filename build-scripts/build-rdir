@@ -210,7 +210,7 @@ case ${platform} in
 deb http://archive.raspberrypi.org/debian/ ${distribution} main
 EOF
 	    # Raspberry kernels and bootloaders are in a separate repo with its own key
-	    cp keys/raspberrypi.gpg.key $target/etc/apt/trusted.gpg.d/raspberrypi-key.asc
+	    cp keys/raspberrypi-archive-keyring.gpg $target/etc/apt/trusted.gpg.d/
 	}
 	;;
     *)
@@ -310,7 +310,7 @@ EOF
 # Invoke the setup script in the target
 setup_apt_sources
 setup_pre_chroot
-systemd-nspawn -D $target/ -a /root/scripts/chroot-setup
+systemd-nspawn --register=no -D $target/ -a /root/scripts/chroot-setup
 setup_post_chroot
 
 # Distribution-specific post-chroot functions
