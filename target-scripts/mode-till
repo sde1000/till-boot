@@ -22,9 +22,9 @@ if [ $(jq '.debug // false' config.json) != "false" ]; then
 fi
 
 # labwc doesn't have an option to hide the pointer yet. A HideCursor
-# action that can be run on startup was added on 25/3/2025 but will
-# take some time to make it through to a release! We need to use the
-# --hide-pointer quicktill option instead, for now.
+# action that can be run on startup was added in release 0.8.4 but
+# some images are still using 0.8.3. We need to use the --hide-pointer
+# quicktill option instead, for now.
 
 # Ensure we start with a fresh labwc configuration directory
 labwc_config=mode-till-labwc-config

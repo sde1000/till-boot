@@ -177,6 +177,7 @@ echo " --> setting up initramfs for network live boot"
 cp /etc/initramfs-tools/initramfs.conf /root/
 sed -e 's/^MODULES=.*$/MODULES=netboot/' \
     -e 's/^BUSYBOX=.*$/BUSYBOX=y/' \
+    -e 's/^FSTYPE=.*$/FSTYPE=overlay,loop,squashfs,nfs/' \
     -e '$a\RESUME=none' \
   </root/initramfs.conf >/etc/initramfs-tools/initramfs.conf
 rm /root/initramfs.conf
