@@ -80,7 +80,7 @@ table inet filter {
         {%- endfor -%}
         {%- endif %}
         # Accept everything from the tills network
-        iif {{interface}} accept
+        iifname {{interface}} accept
         # Reject everything else politely
         reject with icmp type admin-prohibited
     }

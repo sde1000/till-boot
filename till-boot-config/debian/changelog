@@ -1,3 +1,9 @@
+till-boot-config (21) stable; urgency=medium
+
+  * Specify till network interface by name rather than id in nftables config
+
+ -- Stephen Early <steve@assorted.org.uk>  Thu, 29 Oct 2026 10:01:34 +0000
+
 till-boot-config (20) stable; urgency=medium
 
   * Specify a subnet id in generated kea configuration file
