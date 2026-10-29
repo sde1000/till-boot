@@ -42,6 +42,7 @@ numlock_clause=$(jq -r 'if has("numlock") then "<numlock>" + if .numlock then "o
 cat >${labwc_config}/rc.xml <<EOF
 <?xml version="1.0"?>
 <labwc_config>
+<touch mouseEmulation="no" />
 <keyboard>
 ${numlock_clause}
 <keybind key="A-Tab">

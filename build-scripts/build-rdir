@@ -73,6 +73,7 @@ polkitd
 binutils
 jq
 wtype
+libinput-tools
 EOF
 			 )
 
