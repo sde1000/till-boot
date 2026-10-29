@@ -30,14 +30,22 @@ cat >${labwc_config}/rc.xml <<EOF
 <keybind key="C-A-T">
   <action name="Execute" command="lxterminal" />
 </keybind>
+<keybind key="A-W-h">
+  <action name="HideCursor" />
+  <action name="WarpCursor" x="-1" y="-1" />
+</keybind>
 </keyboard>
 </labwc_config>
+EOF
+
+cat >${labwc_config}/autostart <<EOF
+(sleep 10 ; wtype -M alt -M logo -P h) &
 EOF
 
 cat >display-script.sh <<EOF
 #!/bin/bash
 
-./display-browser.py $(jq -r '."display-url" // "https://quicktill.assorted.org.uk/"' config.json) >display.log
+./display-browser.py "$(jq -r '."display-url" // "https://quicktill.assorted.org.uk/"' config.json)" >display.log
 
 if [ -s display.log ]; then
   zenity --title="Browser output" --text-info --filename display.log \\

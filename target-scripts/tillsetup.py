@@ -3,6 +3,7 @@
 network-booted system.
 """
 
+import os
 import sys
 import time
 import requests
@@ -81,6 +82,18 @@ def run():
             r.raise_for_status()
             with open(filename, 'wb') as f:
                 f.write(r.content)
+        except Exception:
+            print(f"failed to fetch {url} as {filename}")
+
+    # Fetch executable files, overwriting existing files if required
+    fetch = config.get("fetch-exec", {})
+    for filename, url in fetch.items():
+        try:
+            r = requests.get(url)
+            r.raise_for_status()
+            with open(filename, 'wb') as f:
+                f.write(r.content)
+            os.chmod(filename, 0o755)
         except Exception:
             print(f"failed to fetch {url} as {filename}")
 
